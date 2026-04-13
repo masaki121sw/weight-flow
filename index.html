@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Weight Flow</title>
+  <meta name="description" content="体重とApple Watchのフィットネスデータを統合管理するアプリです。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <!-- Firebase SDK (compat v9) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+  <!-- Firebase 設定 & 同期モジュール -->
+  <script src="firebase-config.js"></script>
+</head>
+<body>
+  <div class="page-shell">
+
+    <!-- ── HERO ── -->
+    <header class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Weight Flow</p>
+        <h1>体重と運動を、<br><em>ひとつの流れ</em>で。</h1>
+        <p class="hero-text">
+          体重はその場でクイック記録。Apple Watchのランニングやカロリーも合わせて管理して、身体の変化を立体的に見ましょう。
+        </p>
+
+        <div class="hero-badges">
+          <span>⚖️ 体重だけで即記録</span>
+          <span>🏃 ランニング・カロリー連携</span>
+          <span>📊 統合グラフで可視化</span>
+        </div>
+
+        <div class="glance-strip">
+          <article class="glance-chip">
+            <span>固定身長</span>
+            <strong id="heroHeightBadge">未設定</strong>
+          </article>
+          <article class="glance-chip">
+            <span>目標体重</span>
+            <strong id="heroGoalBadge">--.- kg</strong>
+          </article>
+          <article class="glance-chip">
+            <span>今週の運動</span>
+            <strong id="heroWorkoutBadge">-- 回</strong>
+            <p id="heroWorkoutSub">記録が増えると表示</p>
+          </article>
+        </div>
+      </div>
+
+      <!-- Quick Log Card -->
+      <section class="quick-log-card">
+        <div class="quick-log-head">
+          <div>
+            <p class="focus-label">Quick Log</p>
+            <h2>今日を記録する</h2>
+          </div>
+          <p id="quickTrendLabel" class="quick-trend">前回比は記録が増えると表示されます。</p>
+        </div>
+
+        <!-- Tab Switcher -->
+        <div class="log-tabs">
+          <button class="log-tab log-tab-active" data-tab="weight">⚖️ 体重</button>
+          <button class="log-tab" data-tab="workout">🏃 運動</button>
+        </div>
+
+        <!-- Weight Form -->
+        <form id="entryForm" class="quick-form" data-panel="weight">
+          <div class="datetime-row">
+            <label class="field field-date">
+              <span>記録日</span>
+              <input id="entryDate" name="entryDate" type="date" required>
+            </label>
+            <label class="field field-time">
+              <span>時刻</span>
+              <input id="entryTime" name="entryTime" type="time" required>
+            </label>
+          </div>
+
+          <label class="field field-weight">
+            <span>体重</span>
+            <div class="weight-input-shell">
+              <input
+                id="entryWeight"
+                name="entryWeight"
+                type="number"
+                step="0.1"
+                min="1"
+                inputmode="decimal"
+                placeholder="72.4"
+                required
+              >
+              <span class="weight-unit">kg</span>
+            </div>
+          </label>
+
+          <div id="stepButtons" class="stepper-row">
+            <button type="button" class="stepper-button" data-adjust="-0.3">−0.3</button>
+            <button type="button" class="stepper-button" data-adjust="-0.1">−0.1</button>
+            <button type="button" class="stepper-button" data-adjust="0.1">+0.1</button>
+            <button type="button" class="stepper-button" data-adjust="0.3">+0.3</button>
+          </div>
+
+          <div class="form-actions form-actions-tight">
+            <button type="submit" class="button button-primary">記録を保存</button>
+            <button id="fillLatestButton" type="button" class="button button-secondary">前回値を入れる</button>
+            <button id="fillSampleButton" type="button" class="button button-ghost">サンプル</button>
+          </div>
+
+          <p class="form-note">同じ日時の記録は自動で上書きします。</p>
+        </form>
+
+        <!-- Workout Form -->
+        <form id="workoutForm" class="quick-form" data-panel="workout" hidden>
+          <div class="datetime-row">
+            <label class="field">
+              <span>運動日</span>
+              <input id="workoutDate" name="workoutDate" type="date" required>
+            </label>
+            <label class="field">
+              <span>種類</span>
+              <select id="workoutType" name="workoutType" class="select-input">
+                <option value="running">🏃 ランニング</option>
+                <option value="walking">🚶 ウォーキング</option>
+                <option value="cycling">🚴 サイクリング</option>
+                <option value="swimming">🏊 スイミング</option>
+                <option value="hiit">🔥 HIIT</option>
+                <option value="strength">💪 筋トレ</option>
+                <option value="yoga">🧘 ヨガ</option>
+                <option value="other">⚡ その他</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="workout-fields-row">
+            <label class="field">
+              <span>距離 (km)</span>
+              <input id="workoutDistance" name="workoutDistance" type="number" step="0.01" min="0" inputmode="decimal" placeholder="5.2">
+            </label>
+            <label class="field">
+              <span>時間 (分)</span>
+              <input id="workoutDuration" name="workoutDuration" type="number" step="1" min="0" inputmode="numeric" placeholder="30">
+            </label>
+            <label class="field">
+              <span>カロリー (kcal)</span>
+              <input id="workoutCalories" name="workoutCalories" type="number" step="1" min="0" inputmode="numeric" placeholder="320">
+            </label>
+          </div>
+
+          <label class="field">
+            <span>心拍数 平均 (bpm) <em class="optional-tag">任意</em></span>
+            <input id="workoutHeartRate" name="workoutHeartRate" type="number" step="1" min="0" inputmode="numeric" placeholder="145">
+          </label>
+
+          <div class="form-actions form-actions-tight">
+            <button type="submit" class="button button-primary">運動を保存</button>
+            <button id="fillWorkoutSampleButton" type="button" class="button button-ghost">サンプル</button>
+          </div>
+
+          <p class="form-note">距離・時間・カロリーはいずれか1つだけでも保存できます。</p>
+        </form>
+
+        <!-- Current Status Card -->
+        <div class="focus-card">
+          <p class="focus-label">Current Status</p>
+          <p id="heroCurrentWeight" class="focus-value">--.- kg</p>
+          <p id="heroStatus" class="focus-caption">最初の記録を追加すると、ここに進捗が表示されます。</p>
+        </div>
+      </section>
+    </header>
+
+    <!-- ── SYNC PANEL (firebase-sync.js によって描画) ── -->
+    <div id="wf-sync-placeholder"></div>
+
+    <!-- ── DASHBOARD ── -->
+    <main class="dashboard-grid">
+
+      <!-- Profile Panel -->
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <p class="panel-kicker">Profile</p>
+            <h2>固定プロフィール</h2>
+          </div>
+        </div>
+
+        <div class="profile-overview">
+          <article class="profile-tile">
+            <span>固定身長</span>
+            <strong id="profileHeightValue">未設定</strong>
+            <p>一度保存するとそのまま使います。</p>
+          </article>
+          <article class="profile-tile">
+            <span>目標体重</span>
+            <strong id="profileGoalValue">--.- kg</strong>
+            <p id="profileGoalHint">目標を入れると差分を自動表示します。</p>
+          </article>
+        </div>
+
+        <form id="profileForm" class="profile-form">
+          <label class="field">
+            <span>固定身長 (cm)</span>
+            <div class="lock-row">
+              <input id="heightCm" name="heightCm" type="number" step="0.1" min="50" placeholder="170">
+              <button id="toggleHeightLockButton" type="button" class="button button-secondary button-small">身長を編集</button>
+            </div>
+          </label>
+
+          <label class="field">
+            <span>目標体重 (kg)</span>
+            <input id="goalWeightKg" name="goalWeightKg" type="number" step="0.1" min="1" placeholder="65">
+          </label>
+
+          <div class="form-actions field-full">
+            <button type="submit" class="button button-primary">プロフィールを保存</button>
+            <button id="resetButton" type="button" class="button button-ghost">データを初期化</button>
+          </div>
+
+          <p class="field-hint">身長は保存後に固定されます。変更が必要なときだけ「身長を編集」を押してください。</p>
+        </form>
+      </section>
+
+      <!-- Stats Overview Panel -->
+      <section class="panel panel-wide">
+        <div class="panel-heading">
+          <div>
+            <p class="panel-kicker">Overview</p>
+            <h2>今日のインサイト</h2>
+          </div>
+        </div>
+
+        <!-- Weight Stats -->
+        <p class="stats-section-label">⚖️ 体重</p>
+        <div class="stats-grid">
+          <article class="stat-card stat-card-accent">
+            <span>現在の体重</span>
+            <strong id="currentWeightStat">--.- kg</strong>
+            <p id="currentWeightSubtext">最新の記録を表示します</p>
+          </article>
+          <article class="stat-card">
+            <span>前回比</span>
+            <strong id="latestDeltaStat">--.- kg</strong>
+            <p id="latestDeltaSubtext">ひとつ前の記録と比較します</p>
+          </article>
+          <article class="stat-card">
+            <span>直近平均</span>
+            <strong id="rollingAverageStat">--.- kg</strong>
+            <p id="rollingAverageSubtext">最新の数件から平均を出します</p>
+          </article>
+          <article class="stat-card">
+            <span>開始からの変化</span>
+            <strong id="startChangeStat">--.- kg</strong>
+            <p id="startChangeSubtext">最初の記録と比較します</p>
+          </article>
+          <article class="stat-card">
+            <span>目標まで</span>
+            <strong id="goalDeltaStat">--.- kg</strong>
+            <p id="goalDeltaSubtext">目標体重との差です</p>
+          </article>
+          <article class="stat-card stat-card-warm">
+            <span>BMI</span>
+            <strong id="bmiStat">--.-</strong>
+            <p id="bmiSubtext">固定身長を設定すると計算されます</p>
+          </article>
+        </div>
+
+        <!-- Fitness Stats -->
+        <p class="stats-section-label stats-section-label-spaced">🏃 フィットネス（今週）</p>
+        <div class="stats-grid stats-grid-4">
+          <article class="stat-card stat-card-run">
+            <span>運動回数</span>
+            <strong id="weekWorkoutCount">-- 回</strong>
+            <p id="weekWorkoutCountSub">今週のワークアウト</p>
+          </article>
+          <article class="stat-card">
+            <span>合計距離</span>
+            <strong id="weekDistance">-- km</strong>
+            <p id="weekDistanceSub">今週の走行・歩行距離</p>
+          </article>
+          <article class="stat-card">
+            <span>消費カロリー</span>
+            <strong id="weekCalories">-- kcal</strong>
+            <p id="weekCaloriesSub">今週の合計消費</p>
+          </article>
+          <article class="stat-card">
+            <span>平均ペース</span>
+            <strong id="weekAvgPace">--'--"</strong>
+            <p id="weekAvgPaceSub">ランニング平均ペース</p>
+          </article>
+        </div>
+      </section>
+
+      <!-- Chart Panel -->
+      <section class="panel panel-wide">
+        <div class="panel-heading panel-heading-spread">
+          <div>
+            <p class="panel-kicker">Trend</p>
+            <h2>推移グラフ</h2>
+          </div>
+          <div class="chart-toolbar">
+            <div class="chart-toggle">
+              <button class="chart-toggle-btn chart-toggle-active" data-chart="weight">体重</button>
+              <button class="chart-toggle-btn" data-chart="workout">運動</button>
+              <button class="chart-toggle-btn" data-chart="combined">統合</button>
+            </div>
+            <div class="chart-toolbar-actions">
+              <button id="exportButton" type="button" class="button button-secondary">CSV書き出し</button>
+              <button id="importHealthButton" type="button" class="button button-secondary">🍎 Healthから取り込む</button>
+            </div>
+            <input id="healthXmlInput" type="file" accept=".xml" hidden>
+          </div>
+        </div>
+
+        <div class="chart-shell">
+          <svg id="trendChart" viewBox="0 0 720 300" role="img" aria-label="体重推移チャート"></svg>
+        </div>
+        <p id="chartSummary" class="chart-summary">記録が増えると、ここに推移の要約が表示されます。</p>
+      </section>
+
+      <!-- History Panel -->
+      <section class="panel panel-wide">
+        <div class="panel-heading panel-heading-spread">
+          <div>
+            <p class="panel-kicker">History</p>
+            <h2>記録履歴</h2>
+          </div>
+          <div class="history-tab-group">
+            <button class="history-tab history-tab-active" data-history="weight">⚖️ 体重</button>
+            <button class="history-tab" data-history="workout">🏃 運動</button>
+          </div>
+        </div>
+
+        <ul id="historyList" class="history-list">
+          <li class="history-empty">まだ記録がありません。今日の体重だけ入力して始めましょう。</li>
+        </ul>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+  <script src="firebase-sync.js"></script>
+  <script src="chat.js"></script>
+</body>
+</html>

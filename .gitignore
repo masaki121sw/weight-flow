@@ -1,0 +1,13 @@
+# Firebase設定ファイル（APIキーを含むため除外）
+firebase-config.js
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
