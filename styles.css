@@ -1219,6 +1219,8 @@ input:focus, .select-input:focus {
   justify-content: center;
 }
 
+.wf-qr-modal[hidden] { display: none !important; }
+
 .wf-qr-backdrop {
   position: absolute;
   inset: 0;
