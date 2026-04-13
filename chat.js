@@ -8,6 +8,49 @@
   const BOT_NAME = "Flow";
   const TYPING_DELAY = 700; // ms
 
+  function getSyncRuntimeState() {
+    const sync = window.wfSync ?? null;
+    const protocol = window.location.protocol;
+    const host = window.location.hostname;
+    const reachable = protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(host);
+
+    return {
+      sync,
+      status: sync?.status ?? "unconfigured",
+      code: sync?.code ?? localStorage.getItem("weight-flow-sync-code") ?? "",
+      configured: Boolean(sync && sync.status !== "unconfigured"),
+      reachable,
+      protocol,
+      host
+    };
+  }
+
+  function buildSyncAnswer() {
+    const runtime = getSyncRuntimeState();
+
+    if (!runtime.configured) {
+      return `デバイス同期は **Firebase Realtime Database** を使って動きます ☁️\n\n**いまの状態:** まだ同期設定が完了していません\n\n**やること:**\n1. \`firebase-config.js\` に Firebase の設定値を入れる\n2. Firebase の Realtime Database を有効化する\n3. 画面を再読み込みする\n\n設定が完了すると「デバイス同期」パネルに **同期コード** が出て、今ある記録も自動でDBへ保存されます。`;
+    }
+
+    if (!runtime.reachable) {
+      return `同期機能は有効ですが、このURLはスマホ共有向きではありません 📡\n\n**いまの状態:** ${runtime.protocol === "file:" ? "ローカルファイルで開いています" : "この端末専用のURLで開いています"}\n\n**スマホで使うには:**\n1. このアプリを **HTTP/HTTPS のURL** で開く\n2. 「デバイス同期」パネルの **同期コード** をスマホ側で入力する\n3. 共有できるURLなら **QRコード** でも開けます\n\n**現在の同期コード:** ${runtime.code || "まだ未発行です"}`;
+    }
+
+    return `デバイス同期はもう使えます ✅\n\n**使い方:**\n1. この端末の「デバイス同期」パネルで **同期コード** を確認\n2. スマホや別PCで同じアプリを開く\n3. 「別のデバイスのコードを入力」に同じコードを入れる\n4. 接続後は、いまの記録も新しい記録も **Realtime Database** に保存されて自動同期されます\n\n**現在の同期コード:** ${runtime.code || "読み込み中"}\n**同期ステータス:** ${syncStatusLabel(runtime.status)}\n\nQRコードボタンが押せる環境なら、スマホはコード入力なしでも接続できます。`;
+  }
+
+  function syncStatusLabel(status) {
+    const labels = {
+      init: "接続中",
+      ready: "準備完了",
+      syncing: "同期中",
+      synced: "同期済み",
+      offline: "オフライン",
+      unconfigured: "未設定"
+    };
+    return labels[status] || "確認中";
+  }
+
   const FAQ = [
     {
       id: "overview",
@@ -56,6 +99,12 @@
       label: "CSVエクスポート",
       patterns: ["csv", "export", "書き出し", "エクスポート", "ダウンロード", "ファイル", "バックアップ"],
       answer: `記録データをCSVファイルに書き出せます 💾\n\n**手順：**\n1. 「推移グラフ」パネルの右上にある **「CSV書き出し」** ボタンをクリック\n2. ファイルが自動でダウンロードされます\n\n**CSVに含まれるデータ：**\n- 体重記録（日付・時刻・体重）\n- 運動記録（日付・種類・距離・時間・カロリー・心拍数）\n\n💡 ExcelやGoogle スプレッドシートで開いて自分なりの分析もできます！`
+    },
+    {
+      id: "sync",
+      label: "デバイス同期の使い方",
+      patterns: ["同期", "デバイス同期", "スマホでも", "別端末", "リアルタイム同期", "同期コード", "qr", "QR", "database", "db"],
+      answer: buildSyncAnswer
     },
     {
       id: "reset",
@@ -231,7 +280,8 @@
 
       const match = findResponse(text);
       if (match) {
-        addMessage(match.answer, "bot");
+        const answer = typeof match.answer === "function" ? match.answer() : match.answer;
+        addMessage(answer, "bot");
         // フォローアップのサジェスト（別のFAQ）
         const others = FAQ.filter(f => f.id !== match.id).slice(0, 3);
         addFollowUp(others);
@@ -285,8 +335,9 @@
         FAQ.find(f => f.id === "overview"),
         FAQ.find(f => f.id === "weight"),
         FAQ.find(f => f.id === "workout"),
+        FAQ.find(f => f.id === "sync"),
         FAQ.find(f => f.id === "chart"),
-        FAQ.find(f => f.id === "apple-health"),
+        FAQ.find(f => f.id === "apple-health")
       ]);
     }, 600);
   }

@@ -256,6 +256,7 @@ body::before {
   display: flex;
   flex-direction: column;
   gap: 7px;
+  min-width: 0;
 }
 
 .field span {
@@ -287,7 +288,20 @@ input, .select-input {
   background: rgba(255, 255, 255, 0.88);
   transition: border-color 180ms, box-shadow 180ms, transform 180ms;
   width: 100%;
+  min-width: 0;
   min-height: 48px;
+}
+
+.datetime-row > *,
+.workout-fields-row > *,
+.lock-row > * {
+  min-width: 0;
+}
+
+input[type="date"],
+input[type="time"] {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .select-input {
@@ -846,7 +860,7 @@ input:focus, .select-input:focus {
   }
 
   .datetime-row {
-    grid-template-columns: 1.1fr 0.9fr;
+    grid-template-columns: 1fr;
   }
 
   .stepper-row {
@@ -1147,6 +1161,12 @@ input:focus, .select-input:focus {
 
 .sync-action-btn:hover { transform: translateY(-1px); background: #fff; }
 .sync-action-btn:active { transform: translateY(0); }
+.sync-action-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  background: rgba(255,255,255,0.45);
+}
 
 .sync-action-qr { color: var(--run); border-color: rgba(59,111,255,0.2); background: var(--run-soft); }
 .sync-action-primary {
@@ -1161,6 +1181,17 @@ input:focus, .select-input:focus {
   font-size: 0.82rem;
   color: var(--muted);
   line-height: 1.65;
+}
+
+.sync-access-note {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(217,115,72,0.09);
+  border: 1px solid rgba(217,115,72,0.18);
+  color: var(--ink);
+  font-size: 0.84rem;
+  line-height: 1.6;
 }
 
 /* ── コード入力ブロック ── */
