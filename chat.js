@@ -8,49 +8,6 @@
   const BOT_NAME = "Flow";
   const TYPING_DELAY = 700; // ms
 
-  function getSyncRuntimeState() {
-    const sync = window.wfSync ?? null;
-    const protocol = window.location.protocol;
-    const host = window.location.hostname;
-    const reachable = protocol !== "file:" && !["localhost", "127.0.0.1", "::1"].includes(host);
-
-    return {
-      sync,
-      status: sync?.status ?? "unconfigured",
-      code: sync?.code ?? localStorage.getItem("weight-flow-sync-code") ?? "",
-      configured: Boolean(sync && sync.status !== "unconfigured"),
-      reachable,
-      protocol,
-      host
-    };
-  }
-
-  function buildSyncAnswer() {
-    const runtime = getSyncRuntimeState();
-
-    if (!runtime.configured) {
-      return `デバイス同期は **Firebase Realtime Database** を使って動きます ☁️\n\n**いまの状態:** まだ同期設定が完了していません\n\n**やること:**\n1. \`firebase-config.js\` に Firebase の設定値を入れる\n2. Firebase の Realtime Database を有効化する\n3. 画面を再読み込みする\n\n設定が完了すると「デバイス同期」パネルに **同期コード** が出て、今ある記録も自動でDBへ保存されます。`;
-    }
-
-    if (!runtime.reachable) {
-      return `同期機能は有効ですが、このURLはスマホ共有向きではありません 📡\n\n**いまの状態:** ${runtime.protocol === "file:" ? "ローカルファイルで開いています" : "この端末専用のURLで開いています"}\n\n**スマホで使うには:**\n1. このアプリを **HTTP/HTTPS のURL** で開く\n2. 「デバイス同期」パネルの **同期コード** をスマホ側で入力する\n3. 共有できるURLなら **QRコード** でも開けます\n\n**現在の同期コード:** ${runtime.code || "まだ未発行です"}`;
-    }
-
-    return `デバイス同期はもう使えます ✅\n\n**使い方:**\n1. この端末の「デバイス同期」パネルで **同期コード** を確認\n2. スマホや別PCで同じアプリを開く\n3. 「別のデバイスのコードを入力」に同じコードを入れる\n4. 接続後は、いまの記録も新しい記録も **Realtime Database** に保存されて自動同期されます\n\n**現在の同期コード:** ${runtime.code || "読み込み中"}\n**同期ステータス:** ${syncStatusLabel(runtime.status)}\n\nQRコードボタンが押せる環境なら、スマホはコード入力なしでも接続できます。`;
-  }
-
-  function syncStatusLabel(status) {
-    const labels = {
-      init: "接続中",
-      ready: "準備完了",
-      syncing: "同期中",
-      synced: "同期済み",
-      offline: "オフライン",
-      unconfigured: "未設定"
-    };
-    return labels[status] || "確認中";
-  }
-
   const FAQ = [
     {
       id: "overview",
@@ -101,12 +58,6 @@
       answer: `記録データをCSVファイルに書き出せます 💾\n\n**手順：**\n1. 「推移グラフ」パネルの右上にある **「CSV書き出し」** ボタンをクリック\n2. ファイルが自動でダウンロードされます\n\n**CSVに含まれるデータ：**\n- 体重記録（日付・時刻・体重）\n- 運動記録（日付・種類・距離・時間・カロリー・心拍数）\n\n💡 ExcelやGoogle スプレッドシートで開いて自分なりの分析もできます！`
     },
     {
-      id: "sync",
-      label: "デバイス同期の使い方",
-      patterns: ["同期", "デバイス同期", "スマホでも", "別端末", "リアルタイム同期", "同期コード", "qr", "QR", "database", "db"],
-      answer: buildSyncAnswer
-    },
-    {
       id: "reset",
       label: "データの初期化",
       patterns: ["削除", "初期化", "リセット", "消す", "やり直し", "クリア"],
@@ -139,38 +90,21 @@
     const widget = document.createElement("div");
     widget.id = "wf-chat";
     widget.innerHTML = `
-      <!-- 最小化時のミニボタン -->
-      <button id="wf-chat-mini" class="wf-chat-mini" aria-label="チャットを表示" hidden>
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-        </svg>
-      </button>
-
-      <!-- 通常表示エリア -->
-      <div id="wf-chat-main">
-        <!-- 開閉ボタン -->
-        <button id="wf-chat-toggle" class="wf-chat-toggle" aria-label="使い方を聞く" aria-expanded="false">
-          <span class="wf-chat-toggle-icon wf-chat-toggle-open">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            </svg>
-          </span>
-          <span class="wf-chat-toggle-icon wf-chat-toggle-close" hidden>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </span>
-          <span class="wf-chat-toggle-label">使い方を聞く</span>
-          <span class="wf-chat-toggle-label wf-chat-toggle-label-close" hidden>閉じる</span>
-        </button>
-
-        <!-- 非表示ボタン（スマホのみ表示） -->
-        <button id="wf-chat-dismiss" class="wf-chat-dismiss" aria-label="チャットを隠す">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round">
+      <!-- 開閉ボタン -->
+      <button id="wf-chat-toggle" class="wf-chat-toggle" aria-label="使い方を聞く" aria-expanded="false">
+        <span class="wf-chat-toggle-icon wf-chat-toggle-open">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+        </span>
+        <span class="wf-chat-toggle-icon wf-chat-toggle-close" hidden>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
-        </button>
-      </div>
+        </span>
+        <span class="wf-chat-toggle-label">使い方を聞く</span>
+        <span class="wf-chat-toggle-label wf-chat-toggle-label-close" hidden>閉じる</span>
+      </button>
 
       <!-- チャットパネル -->
       <div id="wf-chat-panel" class="wf-chat-panel" hidden role="dialog" aria-label="Weight Flow サポートチャット">
@@ -297,8 +231,7 @@
 
       const match = findResponse(text);
       if (match) {
-        const answer = typeof match.answer === "function" ? match.answer() : match.answer;
-        addMessage(answer, "bot");
+        addMessage(match.answer, "bot");
         // フォローアップのサジェスト（別のFAQ）
         const others = FAQ.filter(f => f.id !== match.id).slice(0, 3);
         addFollowUp(others);
@@ -352,9 +285,8 @@
         FAQ.find(f => f.id === "overview"),
         FAQ.find(f => f.id === "weight"),
         FAQ.find(f => f.id === "workout"),
-        FAQ.find(f => f.id === "sync"),
         FAQ.find(f => f.id === "chart"),
-        FAQ.find(f => f.id === "apple-health")
+        FAQ.find(f => f.id === "apple-health"),
       ]);
     }, 600);
   }
@@ -365,28 +297,9 @@
     const panel = document.getElementById("wf-chat-panel");
     const input = document.getElementById("wf-chat-input");
     const sendBtn = document.getElementById("wf-chat-send");
-    const dismissBtn = document.getElementById("wf-chat-dismiss");
-    const miniBtn = document.getElementById("wf-chat-mini");
-    const chatMain = document.getElementById("wf-chat-main");
 
     let isOpen = false;
     let hasOpened = false;
-
-    // 非表示ボタン（×）
-    dismissBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      chatMain.hidden = true;
-      panel.hidden = true;
-      panel.classList.remove("wf-chat-panel-open");
-      miniBtn.hidden = false;
-      isOpen = false;
-    });
-
-    // ミニボタン（復元）
-    miniBtn.addEventListener("click", () => {
-      miniBtn.hidden = true;
-      chatMain.hidden = false;
-    });
 
     toggle.addEventListener("click", () => {
       isOpen = !isOpen;
