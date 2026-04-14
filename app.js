@@ -36,6 +36,7 @@ let isHeightEditing = !Boolean(state.profile.heightCm);
 let activeLogTab = "weight";
 let activeHistoryTab = "weight";
 let activeChart = "weight";
+let activePeriod = "7d";
 
 // ─── Elements ──────────────────────────────────────────────────────────────
 const el = {
@@ -81,6 +82,7 @@ const el = {
   latestDeltaSubtext: document.getElementById("latestDeltaSubtext"),
   rollingAverageStat: document.getElementById("rollingAverageStat"),
   rollingAverageSubtext: document.getElementById("rollingAverageSubtext"),
+  startChangeLabel: document.getElementById("startChangeLabel"),
   startChangeStat: document.getElementById("startChangeStat"),
   startChangeSubtext: document.getElementById("startChangeSubtext"),
   goalDeltaStat: document.getElementById("goalDeltaStat"),
@@ -95,6 +97,7 @@ const el = {
   weekCaloriesSub: document.getElementById("weekCaloriesSub"),
   weekAvgPace: document.getElementById("weekAvgPace"),
   weekAvgPaceSub: document.getElementById("weekAvgPaceSub"),
+  fitnessSectionLabel: document.getElementById("fitnessSectionLabel"),
 };
 
 // ─── Initialize ─────────────────────────────────────────────────────────────
@@ -175,6 +178,17 @@ function bindEvents() {
       document.querySelectorAll(".chart-toggle-btn").forEach(b => b.classList.remove("chart-toggle-active"));
       btn.classList.add("chart-toggle-active");
       renderChart();
+    });
+  });
+
+  // Period tabs
+  document.querySelectorAll(".period-tab").forEach(btn => {
+    btn.addEventListener("click", () => {
+      activePeriod = btn.dataset.period;
+      document.querySelectorAll(".period-tab").forEach(b => b.classList.remove("period-tab-active"));
+      btn.classList.add("period-tab-active");
+      const metrics = calculateMetrics(state.profile, state.entries, state.workouts);
+      renderStats(metrics);
     });
   });
 }
@@ -391,16 +405,22 @@ function renderStats(metrics) {
   el.latestDeltaSubtext.textContent = metrics.latestDeltaSubtext;
   el.rollingAverageStat.textContent = metrics.rollingAverageLabel;
   el.rollingAverageSubtext.textContent = metrics.rollingAverageSubtext;
-  el.startChangeStat.textContent = metrics.startChangeLabel;
-  el.startChangeSubtext.textContent = metrics.startChangeSubtext;
+  if (el.startChangeLabel) el.startChangeLabel.textContent = `${metrics.periodLabel}の変化`;
+  el.startChangeStat.textContent = metrics.periodChangeLabel;
+  el.startChangeSubtext.textContent = metrics.periodChangeSubtext;
   el.goalDeltaStat.textContent = metrics.goalDeltaLabel;
   el.goalDeltaSubtext.textContent = metrics.goalDeltaSubtext;
   el.bmiStat.textContent = metrics.bmiLabel;
   el.bmiSubtext.textContent = metrics.bmiSubtext;
 
   // Fitness stats
+  if (el.fitnessSectionLabel) {
+    el.fitnessSectionLabel.textContent = `🏃 フィットネス（${metrics.periodLabel}）`;
+  }
   el.weekWorkoutCount.textContent = `${metrics.thisWeekWorkouts.length} 回`;
-  el.weekWorkoutCountSub.textContent = metrics.thisWeekWorkouts.length > 0 ? `今週 ${metrics.thisWeekWorkouts.map(w => workoutLabel(w.type)).join("・")}` : "今週のワークアウト";
+  el.weekWorkoutCountSub.textContent = metrics.thisWeekWorkouts.length > 0
+    ? `${metrics.periodLabel} ${metrics.thisWeekWorkouts.map(w => workoutLabel(w.type)).join("・")}`
+    : `${metrics.periodLabel}のワークアウト`;
   el.weekDistance.textContent = metrics.thisWeekDistance > 0 ? `${metrics.thisWeekDistance.toFixed(1)} km` : "-- km";
   el.weekDistanceSub.textContent = metrics.thisWeekDistance > 0 ? `${metrics.thisWeekWorkouts.filter(w => w.distanceKm).length}件の合計` : "今週の走行・歩行距離";
   el.weekCalories.textContent = metrics.thisWeekCalories > 0 ? `${metrics.thisWeekCalories} kcal` : "-- kcal";
@@ -736,13 +756,45 @@ function calculateMetrics(profile, entries, workouts) {
     bmiSubtext = bmiStatusLabel(bmi);
   }
 
-  // Workout metrics (this week)
+  // ─ Period filtering ─────────────────────────────────────────────────────
   const now = new Date();
-  const weekStart = new Date(now);
-  weekStart.setDate(now.getDate() - now.getDay());
-  weekStart.setHours(0, 0, 0, 0);
+  const periodStart = getPeriodStart(activePeriod, now);
+  const periodLabel = getPeriodLabel(activePeriod);
 
-  const thisWeekWorkouts = workouts.filter(w => new Date(w.date) >= weekStart);
+  // Entries and workouts within the selected period
+  const periodEntries = periodStart
+    ? sortedEntries.filter(e => new Date(e.recordedAt) >= periodStart)
+    : sortedEntries;
+  const periodWorkouts = periodStart
+    ? workouts.filter(w => new Date(w.date + "T00:00:00") >= periodStart)
+    : workouts;
+
+  // Rolling average: use period entries (or all if none in period)
+  if (currentEntry) {
+    const base = periodEntries.length > 0 ? periodEntries : sortedEntries.slice(-7);
+    const avg = base.reduce((s, e) => s + e.weightKg, 0) / base.length;
+    rollingAverageLabel = `${formatWeight(avg)} kg`;
+    rollingAverageSubtext = periodEntries.length > 0
+      ? `${periodLabel}内 ${base.length}件の平均`
+      : `最新${base.length}件の平均`;
+  }
+
+  // Period weight change: earliest entry in period → latest
+  let periodChangeLabel = "--.- kg";
+  let periodChangeSubtext = `${periodLabel}の変化`;
+  if (periodEntries.length >= 2) {
+    const periodFirst = periodEntries[0];
+    const periodLast = periodEntries[periodEntries.length - 1];
+    const periodDelta = periodLast.weightKg - periodFirst.weightKg;
+    periodChangeLabel = formatWeightChange(periodDelta);
+    periodChangeSubtext = `${formatDateTime(periodFirst.recordedAt)} から`;
+  } else if (periodEntries.length === 1) {
+    periodChangeLabel = `${formatWeight(periodEntries[0].weightKg)} kg`;
+    periodChangeSubtext = `${periodLabel}内は1件のみ`;
+  }
+
+  // Fitness stats for selected period
+  const thisWeekWorkouts = periodWorkouts;
   const thisWeekDistance = thisWeekWorkouts.reduce((s, w) => s + (w.distanceKm || 0), 0);
   const thisWeekCalories = thisWeekWorkouts.reduce((s, w) => s + (w.calories || 0), 0);
 
@@ -757,7 +809,7 @@ function calculateMetrics(profile, entries, workouts) {
     const paceM = Math.floor(paceMin);
     const paceS = Math.round((paceMin - paceM) * 60);
     avgPaceLabel = `${paceM}'${String(paceS).padStart(2, "0")}"`;
-    avgPaceSub = `今週${runWorkouts.length}回のランニング`;
+    avgPaceSub = `${periodLabel} ${runWorkouts.length}回のランニング`;
   }
 
   return {
@@ -766,11 +818,32 @@ function calculateMetrics(profile, entries, workouts) {
     latestDeltaLabel, latestDeltaSubtext,
     rollingAverageLabel, rollingAverageSubtext,
     startChangeLabel, startChangeSubtext,
+    periodChangeLabel, periodChangeSubtext,
     goalDeltaLabel, goalDeltaSubtext,
     bmiLabel, bmiSubtext, profileGoalHint,
     thisWeekWorkouts, thisWeekDistance, thisWeekCalories,
-    avgPaceLabel, avgPaceSub
+    avgPaceLabel, avgPaceSub, periodLabel
   };
+}
+
+// ─── Period Helpers ───────────────────────────────────────────────────────────
+function getPeriodStart(period, now) {
+  if (period === "all") return null;
+  const d = new Date(now);
+  if (period === "7d") {
+    d.setDate(d.getDate() - 6);
+  } else if (period === "30d") {
+    d.setDate(d.getDate() - 29);
+  } else if (period === "90d") {
+    d.setDate(d.getDate() - 89);
+  }
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function getPeriodLabel(period) {
+  const labels = { "7d": "今週", "30d": "30日", "90d": "90日", "all": "全期間" };
+  return labels[period] || period;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

@@ -635,6 +635,36 @@ input:focus, .select-input:focus {
 }
 
 /* ─── HISTORY ─── */
+.period-tab-group {
+  display: flex;
+  gap: 6px;
+}
+
+.period-tab {
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 180ms, color 180ms, border-color 180ms;
+}
+
+.period-tab:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.period-tab-active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
 .history-tab-group {
   display: flex;
   gap: 6px;
@@ -807,7 +837,8 @@ input:focus, .select-input:focus {
   .glance-strip,
   .log-tabs,
   .chart-toggle,
-  .history-tab-group {
+  .history-tab-group,
+  .period-tab-group {
     display: grid;
     grid-auto-flow: column;
     grid-auto-columns: max-content;
@@ -821,7 +852,8 @@ input:focus, .select-input:focus {
   .glance-strip::-webkit-scrollbar,
   .log-tabs::-webkit-scrollbar,
   .chart-toggle::-webkit-scrollbar,
-  .history-tab-group::-webkit-scrollbar {
+  .history-tab-group::-webkit-scrollbar,
+  .period-tab-group::-webkit-scrollbar {
     display: none;
   }
 
@@ -848,13 +880,15 @@ input:focus, .select-input:focus {
 
   .log-tabs,
   .history-tab-group,
-  .chart-toggle {
+  .chart-toggle,
+  .period-tab-group {
     padding-bottom: 2px;
   }
 
   .log-tab,
   .history-tab,
-  .chart-toggle-btn {
+  .chart-toggle-btn,
+  .period-tab {
     min-height: 42px;
     white-space: nowrap;
   }
