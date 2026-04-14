@@ -1016,6 +1016,9 @@ input:focus, .select-input:focus {
   .hero-badges {
     display: grid;
     grid-template-columns: 1fr;
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+    overflow-x: visible;
     margin-top: 6px;
     gap: 8px;
   }
@@ -1024,11 +1027,15 @@ input:focus, .select-input:focus {
     padding: 8px 12px;
     font-size: 0.84rem;
     white-space: normal;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .glance-strip {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-flow: row;
+    overflow-x: visible;
     margin-top: 10px;
   }
 
@@ -1241,6 +1248,29 @@ input:focus, .select-input:focus {
   .period-tab {
     padding: 7px 4px;
     font-size: 0.76rem;
+  }
+
+  /* Hero badges: force vertical stack */
+  .hero-badges {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+    overflow-x: visible;
+    gap: 6px;
+  }
+
+  .hero-badges span {
+    white-space: normal;
+    width: 100%;
+  }
+
+  /* Glance strip: 2-column, no horizontal scroll */
+  .glance-strip {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-flow: row;
+    overflow-x: visible;
   }
 
   /* Hero copy */
