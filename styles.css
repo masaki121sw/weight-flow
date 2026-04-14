@@ -69,6 +69,7 @@ body::before {
   background: linear-gradient(140deg, rgba(255, 252, 247, 0.94), rgba(244, 236, 223, 0.76));
   box-shadow: var(--shadow);
   overflow: hidden;
+  overflow-x: clip;
   animation: fade-up 500ms ease both;
 }
 
@@ -185,6 +186,7 @@ body::before {
   gap: 16px;
   animation: fade-up 660ms ease both;
   align-self: start;
+  overflow: hidden; /* 日付ピッカーUIのはみ出しを防止 */
 }
 
 .quick-log-card::before {
@@ -256,6 +258,7 @@ body::before {
   display: flex;
   flex-direction: column;
   gap: 7px;
+  min-width: 0;
 }
 
 .field span {
@@ -287,7 +290,24 @@ input, .select-input {
   background: rgba(255, 255, 255, 0.88);
   transition: border-color 180ms, box-shadow 180ms, transform 180ms;
   width: 100%;
+  min-width: 0;
   min-height: 48px;
+}
+
+.datetime-row > *,
+.workout-fields-row > *,
+.lock-row > * {
+  min-width: 0;
+}
+
+input[type="date"],
+input[type="time"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .select-input {
@@ -449,6 +469,8 @@ input:focus, .select-input:focus {
   backdrop-filter: blur(16px);
   box-shadow: var(--shadow);
   animation: fade-up 740ms ease both;
+  overflow: hidden;
+  overflow-x: clip;
 }
 
 .panel-wide { grid-column: 1 / -1; }
@@ -621,6 +643,36 @@ input:focus, .select-input:focus {
 }
 
 /* ─── HISTORY ─── */
+.period-tab-group {
+  display: flex;
+  gap: 6px;
+}
+
+.period-tab {
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 180ms, color 180ms, border-color 180ms;
+}
+
+.period-tab:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.period-tab-active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
 .history-tab-group {
   display: flex;
   gap: 6px;
@@ -770,7 +822,7 @@ input:focus, .select-input:focus {
 
   .quick-log-card {
     order: 1;
-    margin-inline: -2px;
+    margin-inline: 0;
   }
 
   .profile-overview, .profile-form,
@@ -793,7 +845,8 @@ input:focus, .select-input:focus {
   .glance-strip,
   .log-tabs,
   .chart-toggle,
-  .history-tab-group {
+  .history-tab-group,
+  .period-tab-group {
     display: grid;
     grid-auto-flow: column;
     grid-auto-columns: max-content;
@@ -807,7 +860,8 @@ input:focus, .select-input:focus {
   .glance-strip::-webkit-scrollbar,
   .log-tabs::-webkit-scrollbar,
   .chart-toggle::-webkit-scrollbar,
-  .history-tab-group::-webkit-scrollbar {
+  .history-tab-group::-webkit-scrollbar,
+  .period-tab-group::-webkit-scrollbar {
     display: none;
   }
 
@@ -834,19 +888,21 @@ input:focus, .select-input:focus {
 
   .log-tabs,
   .history-tab-group,
-  .chart-toggle {
+  .chart-toggle,
+  .period-tab-group {
     padding-bottom: 2px;
   }
 
   .log-tab,
   .history-tab,
-  .chart-toggle-btn {
+  .chart-toggle-btn,
+  .period-tab {
     min-height: 42px;
     white-space: nowrap;
   }
 
   .datetime-row {
-    grid-template-columns: 1.1fr 0.9fr;
+    grid-template-columns: 1fr;
   }
 
   .stepper-row {
@@ -961,6 +1017,9 @@ input:focus, .select-input:focus {
   .hero-badges {
     display: grid;
     grid-template-columns: 1fr;
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+    overflow-x: visible;
     margin-top: 6px;
     gap: 8px;
   }
@@ -969,11 +1028,15 @@ input:focus, .select-input:focus {
     padding: 8px 12px;
     font-size: 0.84rem;
     white-space: normal;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .glance-strip {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-flow: row;
+    overflow-x: visible;
     margin-top: 10px;
   }
 
@@ -1053,6 +1116,231 @@ input:focus, .select-input:focus {
 
   .history-tab {
     text-align: center;
+  }
+
+  /* Period tabs: 4-column full-width on small screens */
+  .period-tab-group {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    width: 100%;
+    overflow-x: visible;
+  }
+
+  .period-tab {
+    text-align: center;
+    padding: 7px 6px;
+    font-size: 0.78rem;
+  }
+
+  /* Ensure workout fields stay single column */
+  .workout-fields-row {
+    grid-template-columns: 1fr;
+  }
+
+  /* Quick log card tighter on small screens */
+  .quick-log-card {
+    margin-inline: 0;
+    padding: 16px;
+  }
+
+  /* Ensure form inputs never overflow */
+  .quick-form input,
+  .quick-form select,
+  .quick-form .select-input {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Profile form single column */
+  .profile-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ─── iPhone専用 (430px以下) ─── */
+@media (max-width: 430px) {
+  .page-shell {
+    padding-inline: 8px;
+    padding-top: 10px;
+  }
+
+  .hero,
+  .panel,
+  .quick-log-card {
+    padding: 14px;
+    border-radius: 20px;
+  }
+
+  .hero {
+    gap: 12px;
+    overflow: hidden;
+    overflow-x: clip;
+  }
+
+  /* Force all grid rows to single column */
+  .datetime-row,
+  .workout-fields-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Date/time inputs: force full width + はみ出し防止 */
+  input[type="date"],
+  input[type="time"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    font-size: 0.88rem;
+    padding: 10px 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* フォームフィールドのはみ出し防止 */
+  .field {
+    overflow: hidden;
+    min-width: 0;
+  }
+
+  /* Select inputs */
+  .select-input {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    font-size: 0.88rem;
+    padding: 10px 10px;
+  }
+
+  /* Stepper buttons larger touch targets */
+  .stepper-button {
+    min-height: 46px;
+    font-size: 0.85rem;
+  }
+
+  /* Buttons */
+  .button {
+    width: 100%;
+    font-size: 0.95rem;
+  }
+
+  .form-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  /* Stats: 2-column */
+  .stats-grid,
+  .stats-grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .stat-card {
+    padding: 13px;
+    min-height: 0;
+  }
+
+  .stat-card strong {
+    font-size: 1.15rem;
+  }
+
+  .stat-card span,
+  .stat-card p {
+    font-size: 0.78rem;
+  }
+
+  /* Period tabs */
+  .period-tab-group {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    width: 100%;
+    gap: 4px;
+  }
+
+  .period-tab {
+    padding: 7px 4px;
+    font-size: 0.76rem;
+  }
+
+  /* Hero badges: force vertical stack */
+  .hero-badges {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+    overflow-x: visible;
+    gap: 6px;
+  }
+
+  .hero-badges span {
+    white-space: normal;
+    width: 100%;
+  }
+
+  /* Glance strip: 2-column, no horizontal scroll */
+  .glance-strip {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-flow: row;
+    overflow-x: visible;
+  }
+
+  /* Hero copy */
+  .hero h1 {
+    font-size: clamp(1.7rem, 9vw, 2.4rem);
+  }
+
+  .glance-chip {
+    min-height: 90px;
+    padding: 14px;
+  }
+
+  /* Panel heading */
+  .panel-heading {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .panel-heading h2 {
+    font-size: 1.2rem;
+  }
+
+  .panel-heading-spread {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  /* Lock row */
+  .lock-row {
+    flex-direction: column;
+  }
+
+  .lock-row .button {
+    align-self: flex-start;
+    width: auto;
+  }
+
+  /* Sync panel */
+  .sync-body {
+    grid-template-columns: 1fr;
+  }
+
+  /* History */
+  .history-item,
+  .history-empty {
+    padding: 12px;
+  }
+
+  /* Focus card */
+  .focus-card {
+    padding: 14px;
+  }
+
+  .focus-value {
+    font-size: clamp(1.8rem, 10vw, 2.4rem);
   }
 }
 
@@ -1147,6 +1435,12 @@ input:focus, .select-input:focus {
 
 .sync-action-btn:hover { transform: translateY(-1px); background: #fff; }
 .sync-action-btn:active { transform: translateY(0); }
+.sync-action-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  background: rgba(255,255,255,0.45);
+}
 
 .sync-action-qr { color: var(--run); border-color: rgba(59,111,255,0.2); background: var(--run-soft); }
 .sync-action-primary {
@@ -1161,6 +1455,17 @@ input:focus, .select-input:focus {
   font-size: 0.82rem;
   color: var(--muted);
   line-height: 1.65;
+}
+
+.sync-access-note {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(217,115,72,0.09);
+  border: 1px solid rgba(217,115,72,0.18);
+  color: var(--ink);
+  font-size: 0.84rem;
+  line-height: 1.6;
 }
 
 /* ── コード入力ブロック ── */
@@ -1319,6 +1624,89 @@ input:focus, .select-input:focus {
   flex-direction: column;
   align-items: flex-end;
   gap: 12px;
+}
+
+/* 通常表示エリア（toggle + dismiss をまとめるラッパー） */
+#wf-chat-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── 非表示ボタン（×）── スマホのみ表示 */
+.wf-chat-dismiss {
+  display: none; /* デスクトップでは非表示 */
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(26, 47, 40, 0.12);
+  color: var(--ink);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 160ms, transform 160ms;
+  opacity: 0.7;
+}
+
+.wf-chat-dismiss:hover {
+  background: rgba(26, 47, 40, 0.2);
+  opacity: 1;
+}
+
+/* ── ミニボタンラッパー（アイコン＋完全非表示ボタン） ── */
+.wf-chat-mini-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  position: relative;
+}
+
+/* ── ミニボタン（最小化後の復元ボタン）── */
+.wf-chat-mini {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(135deg, var(--accent), var(--accent-bright));
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(28, 125, 103, 0.36), 0 2px 5px rgba(0,0,0,0.1);
+  transition: transform 220ms ease, box-shadow 220ms ease;
+  flex-shrink: 0;
+}
+
+.wf-chat-mini:hover {
+  transform: translateY(-2px) scale(1.06);
+  box-shadow: 0 8px 22px rgba(28, 125, 103, 0.44);
+}
+
+/* ── 完全非表示ボタン（ミニの上に乗る小さな×）── */
+.wf-chat-hide-all {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(26, 47, 40, 0.55);
+  color: #fff;
+  cursor: pointer;
+  flex-shrink: 0;
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  transition: background 160ms;
+  padding: 0;
+}
+
+.wf-chat-hide-all:hover {
+  background: rgba(26, 47, 40, 0.85);
 }
 
 /* ── 開閉ボタン ── */
@@ -1625,6 +2013,11 @@ input:focus, .select-input:focus {
   .wf-chat-toggle {
     padding: 12px 16px 12px 14px;
     font-size: 0.88rem;
+  }
+
+  /* スマホでは × 非表示ボタンを表示 */
+  .wf-chat-dismiss {
+    display: flex;
   }
 }
 
