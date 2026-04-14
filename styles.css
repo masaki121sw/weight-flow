@@ -69,6 +69,7 @@ body::before {
   background: linear-gradient(140deg, rgba(255, 252, 247, 0.94), rgba(244, 236, 223, 0.76));
   box-shadow: var(--shadow);
   overflow: hidden;
+  overflow-x: clip;
   animation: fade-up 500ms ease both;
 }
 
@@ -300,8 +301,12 @@ input, .select-input {
 
 input[type="date"],
 input[type="time"] {
+  -webkit-appearance: none;
+  appearance: none;
   min-width: 0;
   max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .select-input {
@@ -463,6 +468,8 @@ input:focus, .select-input:focus {
   backdrop-filter: blur(16px);
   box-shadow: var(--shadow);
   animation: fade-up 740ms ease both;
+  overflow: hidden;
+  overflow-x: clip;
 }
 
 .panel-wide { grid-column: 1 / -1; }
@@ -814,7 +821,7 @@ input:focus, .select-input:focus {
 
   .quick-log-card {
     order: 1;
-    margin-inline: -2px;
+    margin-inline: 0;
   }
 
   .profile-overview, .profile-form,
@@ -1101,6 +1108,196 @@ input:focus, .select-input:focus {
 
   .history-tab {
     text-align: center;
+  }
+
+  /* Period tabs: 4-column full-width on small screens */
+  .period-tab-group {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    width: 100%;
+    overflow-x: visible;
+  }
+
+  .period-tab {
+    text-align: center;
+    padding: 7px 6px;
+    font-size: 0.78rem;
+  }
+
+  /* Ensure workout fields stay single column */
+  .workout-fields-row {
+    grid-template-columns: 1fr;
+  }
+
+  /* Quick log card tighter on small screens */
+  .quick-log-card {
+    margin-inline: 0;
+    padding: 16px;
+  }
+
+  /* Ensure form inputs never overflow */
+  .quick-form input,
+  .quick-form select,
+  .quick-form .select-input {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Profile form single column */
+  .profile-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ─── iPhone専用 (430px以下) ─── */
+@media (max-width: 430px) {
+  .page-shell {
+    padding-inline: 8px;
+    padding-top: 10px;
+  }
+
+  .hero,
+  .panel,
+  .quick-log-card {
+    padding: 14px;
+    border-radius: 20px;
+  }
+
+  .hero {
+    gap: 12px;
+    overflow-x: clip;
+  }
+
+  /* Force all grid rows to single column */
+  .datetime-row,
+  .workout-fields-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Date/time inputs: force full width */
+  input[type="date"],
+  input[type="time"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    font-size: 0.95rem;
+  }
+
+  /* Select inputs */
+  .select-input {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* Stepper buttons larger touch targets */
+  .stepper-button {
+    min-height: 46px;
+    font-size: 0.85rem;
+  }
+
+  /* Buttons */
+  .button {
+    width: 100%;
+    font-size: 0.95rem;
+  }
+
+  .form-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  /* Stats: 2-column */
+  .stats-grid,
+  .stats-grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .stat-card {
+    padding: 13px;
+    min-height: 0;
+  }
+
+  .stat-card strong {
+    font-size: 1.15rem;
+  }
+
+  .stat-card span,
+  .stat-card p {
+    font-size: 0.78rem;
+  }
+
+  /* Period tabs */
+  .period-tab-group {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    width: 100%;
+    gap: 4px;
+  }
+
+  .period-tab {
+    padding: 7px 4px;
+    font-size: 0.76rem;
+  }
+
+  /* Hero copy */
+  .hero h1 {
+    font-size: clamp(1.7rem, 9vw, 2.4rem);
+  }
+
+  .glance-chip {
+    min-height: 90px;
+    padding: 14px;
+  }
+
+  /* Panel heading */
+  .panel-heading {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .panel-heading h2 {
+    font-size: 1.2rem;
+  }
+
+  .panel-heading-spread {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  /* Lock row */
+  .lock-row {
+    flex-direction: column;
+  }
+
+  .lock-row .button {
+    align-self: flex-start;
+    width: auto;
+  }
+
+  /* Sync panel */
+  .sync-body {
+    grid-template-columns: 1fr;
+  }
+
+  /* History */
+  .history-item,
+  .history-empty {
+    padding: 12px;
+  }
+
+  /* Focus card */
+  .focus-card {
+    padding: 14px;
+  }
+
+  .focus-value {
+    font-size: clamp(1.8rem, 10vw, 2.4rem);
   }
 }
 

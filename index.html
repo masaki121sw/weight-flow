@@ -223,16 +223,10 @@
 
       <!-- Stats Overview Panel -->
       <section class="panel panel-wide">
-        <div class="panel-heading panel-heading-spread">
+        <div class="panel-heading">
           <div>
             <p class="panel-kicker">Overview</p>
-            <h2>期間インサイト</h2>
-          </div>
-          <div class="period-tab-group">
-            <button class="period-tab period-tab-active" data-period="7d">今週</button>
-            <button class="period-tab" data-period="30d">30日</button>
-            <button class="period-tab" data-period="90d">90日</button>
-            <button class="period-tab" data-period="all">全期間</button>
+            <h2>今日のインサイト</h2>
           </div>
         </div>
 
@@ -255,9 +249,9 @@
             <p id="rollingAverageSubtext">最新の数件から平均を出します</p>
           </article>
           <article class="stat-card">
-            <span id="startChangeLabel">期間内の変化</span>
+            <span>開始からの変化</span>
             <strong id="startChangeStat">--.- kg</strong>
-            <p id="startChangeSubtext">期間の最初と最後を比較します</p>
+            <p id="startChangeSubtext">最初の記録と比較します</p>
           </article>
           <article class="stat-card">
             <span>目標まで</span>
@@ -272,7 +266,7 @@
         </div>
 
         <!-- Fitness Stats -->
-        <p id="fitnessSectionLabel" class="stats-section-label stats-section-label-spaced">🏃 フィットネス（今週）</p>
+        <p class="stats-section-label stats-section-label-spaced">🏃 フィットネス（今週）</p>
         <div class="stats-grid stats-grid-4">
           <article class="stat-card stat-card-run">
             <span>運動回数</span>
