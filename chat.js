@@ -127,7 +127,7 @@
     {
       id: "start",
       label: "まず何から始める？",
-      patterns: ["最初", "始め方", "スタート", "初めて", "初心者", "どこから"],
+      patterns: ["まず", "何から", "始める", "最初", "始め方", "スタート", "初めて", "初心者", "どこから"],
       answer: `初めての方はこの順番で始めると使いやすいです！ 🚀\n\n**Step 1** 📏 **身長を設定する**\n「固定プロフィール」で身長を入力→保存するとBMIが使えます\n\n**Step 2** 🎯 **目標体重を決める**\n同じくプロフィールで目標体重を設定。目標までの差がわかります\n\n**Step 3** ⚖️ **今日の体重を記録する**\n「Quick Log」に体重を入力して「記録を保存」！\n\n**Step 4** 🏃 **運動したら記録する**\n「Quick Log」の運動タブから種類・時間などを入力\n\nあとは毎日続けるだけです！グラフや統計が育っていくのを楽しんでください 😊`
     }
   ];
@@ -276,7 +276,15 @@
 
   // ─── キーワードマッチ ────────────────────────────────────────────────────
   function findResponse(input) {
-    const q = input.toLowerCase().replace(/\s+/g, "");
+    const q = input.trim().toLowerCase().replace(/\s+/g, "");
+
+    // まずラベルと完全一致するか確認（チップをタップした時のため）
+    const labelMatch = FAQ.find(f =>
+      f.label.trim().toLowerCase().replace(/\s+/g, "") === q
+    );
+    if (labelMatch) return labelMatch;
+
+    // 次にパターンマッチ
     for (const faq of FAQ) {
       if (faq.patterns.some(p => q.includes(p.toLowerCase()))) {
         return faq;
