@@ -2087,6 +2087,185 @@ input:focus, .select-input:focus {
   }
 }
 
+/* ─── QUICK SYNC ──────────────────────────────────────────────────────────── */
+.sync-quick {
+  background: rgba(28, 125, 103, 0.05);
+  border: 1px solid rgba(28, 125, 103, 0.16);
+  border-radius: 20px;
+  padding: 22px;
+  margin-bottom: 18px;
+}
+
+.sync-quick-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.sync-quick-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.sync-badge-setup {
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.sync-quick-desc {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.65;
+  margin: 0 0 20px;
+}
+
+.sync-quick-flow {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 16px;
+}
+
+.sync-flow-step {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sync-flow-num {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.sync-flow-sub {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.sync-flow-arrow {
+  font-size: 1.5rem;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1;
+}
+
+/* インポートエリア */
+.sync-import-area {
+  margin-top: 18px;
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: fade-up 200ms ease both;
+}
+
+.sync-import-label {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.sync-import-textarea {
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--ink);
+  background: #fff;
+  resize: vertical;
+  width: 100%;
+  min-height: 96px;
+  transition: border-color 180ms, box-shadow 180ms;
+  box-sizing: border-box;
+}
+
+.sync-import-textarea:focus {
+  outline: none;
+  border-color: rgba(46, 188, 141, 0.6);
+  box-shadow: 0 0 0 4px rgba(46, 188, 141, 0.14);
+}
+
+.sync-import-row {
+  display: flex;
+  gap: 10px;
+}
+
+.sync-import-error {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #e8455a;
+  background: rgba(232, 69, 90, 0.1);
+  padding: 9px 14px;
+  border-radius: 10px;
+  animation: fade-up 180ms ease both;
+}
+
+/* Firebase折りたたみ */
+.sync-advanced-details {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.sync-advanced-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--muted);
+  list-style: none;
+  user-select: none;
+}
+
+.sync-advanced-summary::-webkit-details-marker { display: none; }
+
+.sync-advanced-summary::before {
+  content: "▶";
+  font-size: 0.65rem;
+  transition: transform 200ms;
+  flex-shrink: 0;
+}
+
+details[open] > .sync-advanced-summary::before { transform: rotate(90deg); }
+
+.sync-advanced-details .sync-body {
+  padding: 0 20px 20px;
+  border-top: 1px solid var(--line);
+  margin-top: 0;
+}
+
+@media (max-width: 780px) {
+  .sync-quick-flow {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .sync-flow-arrow { transform: rotate(90deg); }
+  .sync-import-row { flex-direction: column; }
+}
+
 /* ─── TOAST ─────────────────────────────────────────────────────────────── */
 .wf-toast {
   position: fixed;

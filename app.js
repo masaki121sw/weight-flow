@@ -11,6 +11,7 @@ function showToast(message) {
   document.body.appendChild(toast);
   _toastTimer = setTimeout(() => toast.remove(), 2500);
 }
+window.showToast = showToast;
 
 // ─── Storage ───────────────────────────────────────────────────────────────
 const STORAGE_KEY = "weight-flow-storage-v4";

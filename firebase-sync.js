@@ -447,58 +447,82 @@
               <p class="panel-kicker">Sync</p>
               <h2>デバイス同期</h2>
             </div>
-            <div id="wf-sync-status-badge" class="sync-status-badge sync-status-${this.status}">
-              ${this._statusLabel()}
+          </div>
+
+          <!-- ① クイック同期（設定不要・常時表示） -->
+          <div class="sync-quick">
+            <div class="sync-quick-header">
+              <span class="sync-quick-title">クイック同期</span>
+              <span class="sync-badge-setup">設定不要</span>
+            </div>
+            <p class="sync-quick-desc">データをコピーして別のデバイスに貼り付けるだけで同期できます。アカウントや設定は一切不要です。</p>
+
+            <div class="sync-quick-flow">
+              <div class="sync-flow-step">
+                <p class="sync-flow-num">① 書き出す</p>
+                <p class="sync-flow-sub">このデバイスのデータをクリップボードにコピー</p>
+                <button class="sync-action-btn sync-action-primary" id="wf-quick-copy">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  データをコピー
+                </button>
+              </div>
+              <div class="sync-flow-arrow">→</div>
+              <div class="sync-flow-step">
+                <p class="sync-flow-num">② 読み込む</p>
+                <p class="sync-flow-sub">別のデバイスでコピーしたデータを貼り付け</p>
+                <button class="sync-action-btn" id="wf-quick-import-open">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  データを読み込む
+                </button>
+              </div>
+            </div>
+
+            <!-- インポートエリア（初期非表示） -->
+            <div id="wf-import-area" class="sync-import-area" hidden>
+              <p class="sync-import-label">別のデバイスでコピーしたデータをここに貼り付けてください</p>
+              <textarea id="wf-import-paste" class="sync-import-textarea" placeholder='{"profile":{"heightCm":"170",...},"entries":[...],"workouts":[...]}' rows="4" spellcheck="false" autocomplete="off"></textarea>
+              <div class="sync-import-row">
+                <button class="sync-action-btn sync-action-primary" id="wf-import-confirm">読み込む</button>
+                <button class="sync-action-btn" id="wf-import-cancel">キャンセル</button>
+              </div>
+              <p id="wf-import-error" class="sync-import-error" hidden></p>
             </div>
           </div>
 
+          <!-- ② Firebase リアルタイム同期（設定済みの場合のみ・折りたたみ） -->
           ${isOk ? `
-          <div class="sync-body">
-
-            <!-- コード表示エリア -->
-            <div class="sync-code-block">
-              <p class="sync-code-label">あなたの同期コード</p>
-              <div class="sync-code-row">
-                <span class="sync-code-display" id="wf-sync-code-text">${this.code}</span>
-                <button class="sync-action-btn" id="wf-sync-copy-btn" title="コードをコピー">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                  コピー
-                </button>
-                <button class="sync-action-btn sync-action-qr" id="wf-sync-qr-btn" title="QRコードを表示" ${reachable ? "" : "disabled"}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="3" height="3" rx="0.5"/><rect x="19" y="14" width="2" height="2" rx="0.5"/><rect x="14" y="19" width="2" height="2" rx="0.5"/><rect x="19" y="19" width="2" height="2" rx="0.5"/></svg>
-                  QRコード
-                </button>
+          <details class="sync-advanced-details" id="wf-firebase-details">
+            <summary class="sync-advanced-summary">
+              <span>リアルタイム同期（Firebase）</span>
+              <span id="wf-sync-status-badge" class="sync-status-badge sync-status-${this.status}">${this._statusLabel()}</span>
+            </summary>
+            <div class="sync-body">
+              <div class="sync-code-block">
+                <p class="sync-code-label">あなたの同期コード</p>
+                <div class="sync-code-row">
+                  <span class="sync-code-display" id="wf-sync-code-text">${this.code}</span>
+                  <button class="sync-action-btn" id="wf-sync-copy-btn" title="コードをコピー">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    コピー
+                  </button>
+                  <button class="sync-action-btn sync-action-qr" id="wf-sync-qr-btn" title="QRコードを表示" ${reachable ? "" : "disabled"}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="3" height="3" rx="0.5"/><rect x="19" y="14" width="2" height="2" rx="0.5"/><rect x="14" y="19" width="2" height="2" rx="0.5"/><rect x="19" y="19" width="2" height="2" rx="0.5"/></svg>
+                    QRコード
+                  </button>
+                </div>
+                <p class="sync-code-hint">スマホでこのコードを入力、またはQRコードをスキャンすると同じデータが見られます</p>
+                ${shareWarning ? `<p class="sync-access-note">${shareWarning}</p>` : ""}
               </div>
-              <p class="sync-code-hint">スマホでこのコードを入力、またはQRコードをスキャンすると同じデータが見られます</p>
-              ${shareWarning ? `<p class="sync-access-note">${shareWarning}</p>` : ""}
-            </div>
-
-            <!-- 別のコードを入力 -->
-            <div class="sync-change-block">
-              <p class="sync-code-label">別のデバイスのコードを入力</p>
-              <div class="sync-change-row">
-                <input
-                  id="wf-sync-input"
-                  class="sync-input"
-                  type="text"
-                  placeholder="ABCD-EFGH"
-                  maxlength="9"
-                  autocapitalize="characters"
-                  autocomplete="off"
-                  spellcheck="false"
-                >
-                <button class="sync-action-btn sync-action-primary" id="wf-sync-apply-btn">このコードに切り替える</button>
+              <div class="sync-change-block">
+                <p class="sync-code-label">別のデバイスのコードを入力</p>
+                <div class="sync-change-row">
+                  <input id="wf-sync-input" class="sync-input" type="text" placeholder="ABCD-EFGH" maxlength="9" autocapitalize="characters" autocomplete="off" spellcheck="false">
+                  <button class="sync-action-btn sync-action-primary" id="wf-sync-apply-btn">このコードに切り替える</button>
+                </div>
               </div>
             </div>
-
-          </div>
-          ` : `
-          <div class="sync-unconfigured">
-            <p>⚙️ <strong>firebase-config.js</strong> にFirebaseの設定値を入力すると、スマホとリアルタイム同期できるようになります。</p>
-            <p>設定ファイル内のコメントに手順が書いてあります。</p>
-            ${shareWarning ? `<p class="sync-access-note">${shareWarning}</p>` : ""}
-          </div>
-          `}
+          </details>
+          ` : ""}
         </section>
 
         <!-- QRモーダル -->
@@ -539,6 +563,81 @@
     }
 
     _bindPanelEvents() {
+      // ── クイックコピー ───────────────────────────────────────────────────
+      document.getElementById("wf-quick-copy")?.addEventListener("click", () => {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) {
+          if (typeof window.showToast === "function") window.showToast("まだ記録がありません");
+          return;
+        }
+        try {
+          const { _ts, ...exportData } = JSON.parse(raw);
+          navigator.clipboard.writeText(JSON.stringify(exportData)).then(() => {
+            const btn = document.getElementById("wf-quick-copy");
+            if (btn) {
+              btn.textContent = "✓ コピーしました";
+              setTimeout(() => {
+                btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> データをコピー';
+              }, 2000);
+            }
+          });
+        } catch { alert("データのコピーに失敗しました。"); }
+      });
+
+      // ── インポートエリアの開閉 ───────────────────────────────────────────
+      document.getElementById("wf-quick-import-open")?.addEventListener("click", () => {
+        const area = document.getElementById("wf-import-area");
+        if (area) { area.hidden = false; document.getElementById("wf-import-paste")?.focus(); }
+      });
+
+      document.getElementById("wf-import-cancel")?.addEventListener("click", () => {
+        document.getElementById("wf-import-area").hidden = true;
+        document.getElementById("wf-import-paste").value = "";
+        const err = document.getElementById("wf-import-error");
+        if (err) err.hidden = true;
+      });
+
+      // ── インポート実行 ──────────────────────────────────────────────────
+      document.getElementById("wf-import-confirm")?.addEventListener("click", () => {
+        const text = (document.getElementById("wf-import-paste")?.value ?? "").trim();
+        const errorEl = document.getElementById("wf-import-error");
+
+        const showErr = (msg) => { errorEl.textContent = msg; errorEl.hidden = false; };
+
+        if (!text) { showErr("データを貼り付けてください。"); return; }
+
+        try {
+          const parsed = JSON.parse(text);
+          const normalized = normalizeSyncState(parsed);
+
+          if (!hasMeaningfulState(normalized)) {
+            showErr("有効なデータが見つかりませんでした。コピーしたデータをそのまま貼り付けてください。");
+            return;
+          }
+
+          const entryCount = normalized.entries.length;
+          const workoutCount = normalized.workouts.length;
+          if (!confirm(`体重 ${entryCount} 件・運動 ${workoutCount} 件を読み込みます。現在のデータは上書きされます。よろしいですか？`)) return;
+
+          const ts = Date.now();
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...normalized, _ts: ts }));
+          if (typeof window.wfApplyRemoteState === "function") {
+            window.wfApplyRemoteState({ ...normalized, _ts: ts });
+          }
+
+          document.getElementById("wf-import-area").hidden = true;
+          document.getElementById("wf-import-paste").value = "";
+          errorEl.hidden = true;
+
+          if (typeof window.showToast === "function") {
+            window.showToast(`✓ ${entryCount + workoutCount} 件のデータを読み込みました`);
+          }
+        } catch {
+          showErr("データの読み込みに失敗しました。コピーしたデータをそのままペーストしてください。");
+        }
+      });
+
+      // ── Firebase: コードコピーボタン ─────────────────────────────────────
       // コピーボタン
       document.getElementById("wf-sync-copy-btn")?.addEventListener("click", () => {
         navigator.clipboard.writeText(this.code).then(() => {
