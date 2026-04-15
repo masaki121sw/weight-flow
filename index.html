@@ -11,6 +11,8 @@
   <!-- Firebase SDK (compat v9) -->
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+  <!-- QRコード生成ライブラリ -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <!-- Firebase 設定 & 同期モジュール -->
   <script src="firebase-config.js"></script>
 </head>
@@ -94,6 +96,7 @@
               <span class="weight-unit">kg</span>
             </div>
           </label>
+          <p id="entryWeightError" class="form-error" hidden>体重を入力してください。</p>
 
           <div id="stepButtons" class="stepper-row">
             <button type="button" class="stepper-button" data-adjust="-0.3">−0.3</button>
@@ -107,6 +110,7 @@
             <button id="fillLatestButton" type="button" class="button button-secondary">前回値を入れる</button>
             <button id="fillSampleButton" type="button" class="button button-ghost">サンプル</button>
           </div>
+          <p id="prevValueHint" class="prev-value-hint" hidden></p>
 
           <p class="form-note">同じ日時の記録は自動で上書きします。</p>
         </form>
@@ -147,6 +151,7 @@
               <input id="workoutCalories" name="workoutCalories" type="number" step="1" min="0" inputmode="numeric" placeholder="320">
             </label>
           </div>
+          <p id="workoutFieldsError" class="form-error" hidden>距離・時間・カロリーのいずれかを入力してください。</p>
 
           <label class="field">
             <span>心拍数 平均 (bpm) <em class="optional-tag">任意</em></span>
@@ -223,10 +228,16 @@
 
       <!-- Stats Overview Panel -->
       <section class="panel panel-wide">
-        <div class="panel-heading">
+        <div class="panel-heading panel-heading-spread">
           <div>
             <p class="panel-kicker">Overview</p>
-            <h2>今日のインサイト</h2>
+            <h2>期間インサイト</h2>
+          </div>
+          <div class="period-tab-group">
+            <button class="period-tab period-tab-active" data-period="7d">直近7日</button>
+            <button class="period-tab" data-period="30d">30日</button>
+            <button class="period-tab" data-period="90d">90日</button>
+            <button class="period-tab" data-period="all">全期間</button>
           </div>
         </div>
 
@@ -249,9 +260,9 @@
             <p id="rollingAverageSubtext">最新の数件から平均を出します</p>
           </article>
           <article class="stat-card">
-            <span>開始からの変化</span>
+            <span id="startChangeLabel">期間内の変化</span>
             <strong id="startChangeStat">--.- kg</strong>
-            <p id="startChangeSubtext">最初の記録と比較します</p>
+            <p id="startChangeSubtext">期間の最初と最後を比較します</p>
           </article>
           <article class="stat-card">
             <span>目標まで</span>
@@ -266,7 +277,7 @@
         </div>
 
         <!-- Fitness Stats -->
-        <p class="stats-section-label stats-section-label-spaced">🏃 フィットネス（今週）</p>
+        <p id="fitnessSectionLabel" class="stats-section-label stats-section-label-spaced">🏃 フィットネス（今週）</p>
         <div class="stats-grid stats-grid-4">
           <article class="stat-card stat-card-run">
             <span>運動回数</span>
@@ -337,6 +348,12 @@
       </section>
 
     </main>
+  </div>
+
+  <!-- チャートツールチップ -->
+  <div id="chart-tooltip" class="chart-tooltip" hidden role="tooltip">
+    <strong id="chart-tooltip-weight"></strong>
+    <span id="chart-tooltip-date"></span>
   </div>
 
   <script src="app.js"></script>

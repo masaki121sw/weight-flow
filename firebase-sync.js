@@ -23,13 +23,15 @@
     } catch { return false; }
   }
 
-  // ── 8文字の同期コードを生成 ───────────────────────────────────────────────
+  // ── 8文字の同期コードを生成（暗号的に安全なランダム値を使用）────────────
   function generateCode() {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // 紛らわしい文字を除外
+    const randomBytes = new Uint8Array(8);
+    crypto.getRandomValues(randomBytes);
     let code = "";
     for (let i = 0; i < 8; i++) {
       if (i === 4) code += "-";
-      code += chars[Math.floor(Math.random() * chars.length)];
+      code += chars[randomBytes[i] % chars.length];
     }
     return code; // 例: ABCD-EFGH
   }
@@ -552,11 +554,22 @@
           return;
         }
         const url = `${location.origin}${location.pathname}?sync=${this.code}`;
-        const qrUrl = `https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=${encodeURIComponent(url)}&choe=UTF-8`;
-        const img = document.getElementById("wf-qr-img");
-        if (img) img.src = qrUrl;
         const modal = document.getElementById("wf-qr-modal");
-        if (modal) modal.hidden = false;
+        const img = document.getElementById("wf-qr-img");
+
+        if (typeof QRCode !== "undefined") {
+          QRCode.toDataURL(url, { width: 200, margin: 2, color: { dark: "#1a2f28", light: "#fffdf8" } })
+            .then(dataUrl => {
+              if (img) img.src = dataUrl;
+              if (modal) modal.hidden = false;
+            })
+            .catch(() => {
+              alert("QRコードの生成に失敗しました。");
+            });
+        } else {
+          // qrcode.js が読み込まれていない場合はURLをアラートで表示
+          alert(`同期URL:\n${url}`);
+        }
       });
 
       // モーダルを閉じる

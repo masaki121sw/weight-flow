@@ -1,3 +1,17 @@
+// ─── Toast ──────────────────────────────────────────────────────────────────
+let _toastTimer = null;
+function showToast(message) {
+  const existing = document.getElementById("wf-toast");
+  if (existing) { clearTimeout(_toastTimer); existing.remove(); }
+  const toast = document.createElement("div");
+  toast.id = "wf-toast";
+  toast.className = "wf-toast";
+  toast.setAttribute("role", "status");
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  _toastTimer = setTimeout(() => toast.remove(), 2500);
+}
+
 // ─── Storage ───────────────────────────────────────────────────────────────
 const STORAGE_KEY = "weight-flow-storage-v4";
 const DRAFT_STORAGE_KEY = "weight-flow-draft-v1";
@@ -98,6 +112,12 @@ const el = {
   weekAvgPace: document.getElementById("weekAvgPace"),
   weekAvgPaceSub: document.getElementById("weekAvgPaceSub"),
   fitnessSectionLabel: document.getElementById("fitnessSectionLabel"),
+  entryWeightError: document.getElementById("entryWeightError"),
+  workoutFieldsError: document.getElementById("workoutFieldsError"),
+  prevValueHint: document.getElementById("prevValueHint"),
+  chartTooltip: document.getElementById("chart-tooltip"),
+  chartTooltipWeight: document.getElementById("chart-tooltip-weight"),
+  chartTooltipDate: document.getElementById("chart-tooltip-date"),
 };
 
 // ─── Initialize ─────────────────────────────────────────────────────────────
@@ -113,6 +133,7 @@ function initialize() {
   syncProfileForm();
   applyStoredDrafts();
   bindEvents();
+  bindTooltipEvents();
   syncHeightLockState();
   render();
 }
@@ -131,6 +152,42 @@ window.wfApplyRemoteState = function (remote) {
   render();
 };
 
+// ─── Chart Tooltip ──────────────────────────────────────────────────────────
+function bindTooltipEvents() {
+  const tooltip = el.chartTooltip;
+  if (!tooltip) return;
+
+  function show(dot, clientX, clientY) {
+    const weight = dot.dataset.weight;
+    const date = dot.dataset.date;
+    if (!weight || !date) return;
+    el.chartTooltipWeight.textContent = `${parseFloat(weight).toFixed(1)} kg`;
+    el.chartTooltipDate.textContent = formatShortDateTime(date);
+    tooltip.style.left = `${clientX}px`;
+    tooltip.style.top = `${clientY}px`;
+    tooltip.hidden = false;
+  }
+
+  el.trendChart.addEventListener("mouseover", (e) => {
+    const dot = e.target.closest(".chart-dot");
+    if (!dot) { tooltip.hidden = true; return; }
+    const rect = dot.getBoundingClientRect();
+    show(dot, rect.left + rect.width / 2, rect.top);
+  });
+
+  el.trendChart.addEventListener("mouseleave", () => { tooltip.hidden = true; });
+
+  let _tipTimer = null;
+  el.trendChart.addEventListener("touchstart", (e) => {
+    const dot = e.target.closest(".chart-dot");
+    if (!dot) return;
+    const t = e.touches[0];
+    show(dot, t.clientX, t.clientY);
+    clearTimeout(_tipTimer);
+    _tipTimer = setTimeout(() => { tooltip.hidden = true; }, 2500);
+  }, { passive: true });
+}
+
 function bindEvents() {
   el.entryForm.addEventListener("submit", handleEntrySubmit);
   el.workoutForm.addEventListener("submit", handleWorkoutSubmit);
@@ -148,6 +205,12 @@ function bindEvents() {
   [el.entryForm, el.workoutForm, el.profileForm].forEach(form => {
     form.addEventListener("input", persistCurrentInputs);
     form.addEventListener("change", persistCurrentInputs);
+  });
+
+  // インラインエラーをクリア
+  el.entryWeight.addEventListener("input", () => { el.entryWeightError.hidden = true; });
+  [el.workoutDistance, el.workoutDuration, el.workoutCalories].forEach(inp => {
+    inp.addEventListener("input", () => { el.workoutFieldsError.hidden = true; });
   });
 
   // Log tabs
@@ -199,10 +262,16 @@ function handleEntrySubmit(event) {
   const date = el.entryDate.value || todayIsoDate();
   const time = el.entryTime.value || currentTimeValue();
   const weight = parseNumber(el.entryWeight.value);
-  if (!weight) { alert("体重を入力してください。"); return; }
+  if (!weight) {
+    el.entryWeightError.hidden = false;
+    el.entryWeight.focus();
+    return;
+  }
+  el.entryWeightError.hidden = true;
 
   const recordedAt = combineDateAndTime(date, time);
   const existing = state.entries.find(e => e.recordedAt === recordedAt);
+  const isOverwrite = Boolean(existing);
   if (existing) {
     state.entries = state.entries.map(e => e.recordedAt === recordedAt ? { ...e, weightKg: weight } : e);
   } else {
@@ -216,6 +285,7 @@ function handleEntrySubmit(event) {
   persistCurrentInputs();
   render();
   el.entryWeight.focus();
+  showToast(isOverwrite ? `✓ ${formatWeight(weight)} kg に上書きしました` : `✓ ${formatWeight(weight)} kg を記録しました`);
 }
 
 function handleWorkoutSubmit(event) {
@@ -228,9 +298,11 @@ function handleWorkoutSubmit(event) {
   const heartRate = parseNumber(el.workoutHeartRate.value);
 
   if (!distance && !duration && !calories) {
-    alert("距離・時間・カロリーのいずれかを入力してください。");
+    el.workoutFieldsError.hidden = false;
+    el.workoutDistance.focus();
     return;
   }
+  el.workoutFieldsError.hidden = true;
 
   state.workouts = [...state.workouts, {
     id: crypto.randomUUID(),
@@ -248,6 +320,7 @@ function handleWorkoutSubmit(event) {
   syncWorkoutDateInput();
   persistCurrentInputs();
   render();
+  showToast(`✓ ${workoutLabel(type)}を記録しました`);
 }
 
 function handleProfileSubmit(event) {
@@ -284,6 +357,8 @@ function handleHistoryClick(event) {
   const btn = event.target.closest("[data-entry-id]");
   if (!btn) return;
   const { entryId, entryType } = btn.dataset;
+  const label = entryType === "workout" ? "この運動記録" : "この体重記録";
+  if (!confirm(`${label}を削除しますか？`)) return;
   if (entryType === "workout") {
     state.workouts = state.workouts.filter(w => w.id !== entryId);
   } else {
@@ -295,7 +370,7 @@ function handleHistoryClick(event) {
 
 function fillWithLatestWeight() {
   const latest = getLatestEntry(state.entries);
-  if (!latest) { alert("まだ前回値がありません。最初の記録を追加してください。"); return; }
+  if (!latest) { showToast("まだ前回値がありません"); return; }
   el.entryWeight.value = formatWeight(latest.weightKg);
   persistCurrentInputs();
   el.entryWeight.focus();
@@ -378,6 +453,17 @@ function render() {
   renderStats(metrics);
   renderHistory();
   renderChart();
+  updatePrevValueHint(metrics);
+}
+
+function updatePrevValueHint(metrics) {
+  const latest = metrics.sortedEntries.at(-1) ?? null;
+  if (latest) {
+    el.prevValueHint.textContent = `前回: ${formatWeight(latest.weightKg)} kg（${formatShortDateTime(latest.recordedAt)}）`;
+    el.prevValueHint.hidden = false;
+  } else {
+    el.prevValueHint.hidden = true;
+  }
 }
 
 function renderHero(metrics) {
@@ -486,6 +572,7 @@ function renderWorkoutHistory() {
 
 // ─── Chart ───────────────────────────────────────────────────────────────────
 function renderChart() {
+  if (el.chartTooltip) el.chartTooltip.hidden = true;
   const sorted = getSortedEntries(state.entries);
   const goalWeight = parseNumber(state.profile.goalWeightKg);
 
@@ -529,9 +616,19 @@ function renderWeightChart(sorted, goalWeight) {
   const goalLine = isFinite(goalWeight)
     ? `<line x1="${padding.left}" y1="${yFor(goalWeight).toFixed(1)}" x2="${width - padding.right}" y2="${yFor(goalWeight).toFixed(1)}" stroke="#d97348" stroke-width="2" stroke-dasharray="7 7"></line>
        <text x="${width - padding.right}" y="${(yFor(goalWeight) - 9).toFixed(1)}" text-anchor="end" font-size="11" fill="#d97348">Goal ${formatWeight(goalWeight)}kg</text>` : "";
-  const dots = points.map(p => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" fill="#fffbf4" stroke="#1c7d67" stroke-width="2.5"></circle>`).join("");
+  const dots = sorted.map((e, i) => `
+    <circle cx="${points[i].x.toFixed(1)}" cy="${points[i].y.toFixed(1)}" r="5" fill="#fffbf4" stroke="#1c7d67" stroke-width="2.5"></circle>
+    <circle class="chart-dot" cx="${points[i].x.toFixed(1)}" cy="${points[i].y.toFixed(1)}" r="12" fill="transparent" stroke="none" data-weight="${e.weightKg}" data-date="${e.recordedAt}"></circle>
+  `).join("");
 
+  const first = sorted[0], last = sorted.at(-1);
+  const totalChange = last.weightKg - first.weightKg;
+  const goalSummary = isFinite(goalWeight) ? goalSummaryText(last.weightKg, goalWeight) : "目標体重を入れると、ゴールラインも表示されます。";
+  const summaryText = `${formatDateTime(first.recordedAt)}から${formatDateTime(last.recordedAt)}までで ${formatWeightChange(totalChange)}。${goalSummary}`;
+
+  svg.setAttribute("aria-label", summaryText);
   svg.innerHTML = `
+    <title>${summaryText}</title>
     <defs>
       <linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0%" stop-color="rgba(28,125,103,0.3)"></stop>
@@ -544,10 +641,7 @@ function renderWeightChart(sorted, goalWeight) {
     ${dots}${xLabels}
   `;
 
-  const first = sorted[0], last = sorted.at(-1);
-  const totalChange = last.weightKg - first.weightKg;
-  const goalSummary = isFinite(goalWeight) ? goalSummaryText(last.weightKg, goalWeight) : "目標体重を入れると、ゴールラインも表示されます。";
-  el.chartSummary.textContent = `${formatDateTime(first.recordedAt)}から${formatDateTime(last.recordedAt)}までで ${formatWeightChange(totalChange)}。${goalSummary}`;
+  el.chartSummary.textContent = summaryText;
 }
 
 function renderWorkoutChart() {
@@ -587,10 +681,13 @@ function renderWorkoutChart() {
             <text x="${padding.left - 10}" y="${(y + 4).toFixed(1)}" text-anchor="end" font-size="10" fill="#5e7268">${v}</text>`;
   }).join("");
 
-  svg.innerHTML = `${yTicks}${bars}`;
-
   const totalCal = sorted.reduce((s, w) => s + (w.calories || 0), 0);
-  el.chartSummary.textContent = `全${sorted.length}回の運動記録。合計消費カロリー ${totalCal} kcal。最近20件を表示しています。`;
+  const workoutSummaryText = `全${sorted.length}回の運動記録。合計消費カロリー ${totalCal} kcal。最近20件を表示しています。`;
+
+  svg.setAttribute("aria-label", workoutSummaryText);
+  svg.innerHTML = `<title>${workoutSummaryText}</title>${yTicks}${bars}`;
+
+  el.chartSummary.textContent = workoutSummaryText;
 }
 
 function renderCombinedChart(sortedEntries, goalWeight) {
@@ -614,7 +711,10 @@ function renderCombinedChart(sortedEntries, goalWeight) {
     const yFor = (w) => padding.top + (1 - (w - minW) / range) * innerHeight;
     const points = sortedEntries.map((e, i) => ({ x: xFor(i), y: yFor(e.weightKg) }));
     const line = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ");
-    const dots = points.map(p => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4.5" fill="#fffbf4" stroke="#1c7d67" stroke-width="2.5"></circle>`).join("");
+    const dots = sortedEntries.map((e, i) => `
+      <circle cx="${points[i].x.toFixed(1)}" cy="${points[i].y.toFixed(1)}" r="4.5" fill="#fffbf4" stroke="#1c7d67" stroke-width="2.5"></circle>
+      <circle class="chart-dot" cx="${points[i].x.toFixed(1)}" cy="${points[i].y.toFixed(1)}" r="12" fill="transparent" stroke="none" data-weight="${e.weightKg}" data-date="${e.recordedAt}"></circle>
+    `).join("");
     const xLabels = buildXLabels(sortedEntries, xFor, height - 18);
     weightSVG = `
       <defs>
@@ -652,11 +752,14 @@ function renderCombinedChart(sortedEntries, goalWeight) {
     }).join("");
   }
 
-  svg.innerHTML = weightSVG + workoutSVG;
-
   const totalWorkouts = state.workouts.length;
   const totalCal = state.workouts.reduce((s, w) => s + (w.calories || 0), 0);
-  el.chartSummary.textContent = `体重推移と${totalWorkouts}回の運動記録を統合表示。縦線がワークアウトのタイミングを示します。${totalCal > 0 ? `合計消費カロリー ${totalCal} kcal。` : ""}`;
+  const combinedSummaryText = `体重推移と${totalWorkouts}回の運動記録を統合表示。縦線がワークアウトのタイミングを示します。${totalCal > 0 ? `合計消費カロリー ${totalCal} kcal。` : ""}`;
+
+  svg.setAttribute("aria-label", combinedSummaryText);
+  svg.innerHTML = `<title>${combinedSummaryText}</title>` + weightSVG + workoutSVG;
+
+  el.chartSummary.textContent = combinedSummaryText;
 }
 
 function emptyChartSVG(title, sub) {
@@ -692,7 +795,7 @@ function chartDims() {
 // ─── Metrics ─────────────────────────────────────────────────────────────────
 function calculateMetrics(profile, entries, workouts) {
   const sortedEntries = getSortedEntries(entries);
-  const currentEntry = getLatestEntry(sortedEntries);
+  const currentEntry = sortedEntries.at(-1) ?? null;
   const previousEntry = sortedEntries.length > 1 ? sortedEntries[sortedEntries.length - 2] : null;
   const firstEntry = sortedEntries[0] ?? null;
   const currentWeight = currentEntry?.weightKg ?? null;
@@ -708,8 +811,6 @@ function calculateMetrics(profile, entries, workouts) {
   let latestDeltaSubtext = "ひとつ前の記録と比較します";
   let rollingAverageLabel = "--.- kg";
   let rollingAverageSubtext = "最新の数件から平均を出します";
-  let startChangeLabel = "--.- kg";
-  let startChangeSubtext = "最初の記録と比較します";
   let goalDeltaLabel = "--.- kg";
   let goalDeltaSubtext = "目標体重との差です";
   let bmiLabel = "--.-";
@@ -734,12 +835,6 @@ function calculateMetrics(profile, entries, workouts) {
     latestDeltaLabel = "初回";
     latestDeltaSubtext = "比較対象の記録がまだありません";
     quickTrendText = "これは最初の記録です。次回から前回比が出ます。";
-  }
-
-  if (currentEntry && firstEntry) {
-    const startDelta = currentEntry.weightKg - firstEntry.weightKg;
-    startChangeLabel = formatWeightChange(startDelta);
-    startChangeSubtext = `${formatDateTime(firstEntry.recordedAt)} からの変化`;
   }
 
   if (currentWeight && isFinite(goalWeight)) {
@@ -817,7 +912,6 @@ function calculateMetrics(profile, entries, workouts) {
     heroMessage, quickTrendText, currentDateLabel,
     latestDeltaLabel, latestDeltaSubtext,
     rollingAverageLabel, rollingAverageSubtext,
-    startChangeLabel, startChangeSubtext,
     periodChangeLabel, periodChangeSubtext,
     goalDeltaLabel, goalDeltaSubtext,
     bmiLabel, bmiSubtext, profileGoalHint,
@@ -842,7 +936,7 @@ function getPeriodStart(period, now) {
 }
 
 function getPeriodLabel(period) {
-  const labels = { "7d": "今週", "30d": "30日", "90d": "90日", "all": "全期間" };
+  const labels = { "7d": "直近7日", "30d": "30日", "90d": "90日", "all": "全期間" };
   return labels[period] || period;
 }
 
