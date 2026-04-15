@@ -1,5 +1,15 @@
 // ─── Storage ───────────────────────────────────────────────────────────────
 const STORAGE_KEY = "weight-flow-storage-v4";
+const DRAFT_STORAGE_KEY = "weight-flow-draft-v1";
+const LEGACY_STORAGE_KEYS = [
+  "weight-flow-storage-v3",
+  "weight-flow-storage-v2",
+  "weight-flow-storage-v1",
+  "weight-flow-storage",
+  "weight-flow-data",
+  "weightflow-storage",
+  "weightflow-data"
+];
 
 const defaultState = {
   profile: { heightCm: "", goalWeightKg: "" },
@@ -7,12 +17,26 @@ const defaultState = {
   workouts: []
 };
 
+const defaultDrafts = {
+  entry: { date: "", time: "", weight: "" },
+  workout: { date: "", type: "", distance: "", duration: "", calories: "", heartRate: "" },
+  profile: { heightCm: "", goalWeightKg: "" }
+};
+
 // ─── State ─────────────────────────────────────────────────────────────────
-let state = loadState();
+const initialState = loadState();
+const initialDrafts = loadDrafts();
+let state = initialState.state;
+let restoredFromStorageKey = initialState.source && initialState.source !== STORAGE_KEY
+  ? initialState.source
+  : null;
+let formDrafts = initialDrafts ?? structuredClone(defaultDrafts);
+let hasStoredDrafts = Boolean(initialDrafts);
 let isHeightEditing = !Boolean(state.profile.heightCm);
 let activeLogTab = "weight";
 let activeHistoryTab = "weight";
 let activeChart = "weight";
+let activePeriod = "7d";
 
 // ─── Elements ──────────────────────────────────────────────────────────────
 const el = {
@@ -58,6 +82,7 @@ const el = {
   latestDeltaSubtext: document.getElementById("latestDeltaSubtext"),
   rollingAverageStat: document.getElementById("rollingAverageStat"),
   rollingAverageSubtext: document.getElementById("rollingAverageSubtext"),
+  startChangeLabel: document.getElementById("startChangeLabel"),
   startChangeStat: document.getElementById("startChangeStat"),
   startChangeSubtext: document.getElementById("startChangeSubtext"),
   goalDeltaStat: document.getElementById("goalDeltaStat"),
@@ -72,16 +97,22 @@ const el = {
   weekCaloriesSub: document.getElementById("weekCaloriesSub"),
   weekAvgPace: document.getElementById("weekAvgPace"),
   weekAvgPaceSub: document.getElementById("weekAvgPaceSub"),
+  fitnessSectionLabel: document.getElementById("fitnessSectionLabel"),
 };
 
 // ─── Initialize ─────────────────────────────────────────────────────────────
 initialize();
 
 function initialize() {
+  if (restoredFromStorageKey) {
+    writeStateToStorage(state);
+    restoredFromStorageKey = null;
+  }
   syncEntryDateTimeInputs();
   syncWorkoutDateInput();
-  bindEvents();
   syncProfileForm();
+  applyStoredDrafts();
+  bindEvents();
   syncHeightLockState();
   render();
 }
@@ -95,6 +126,7 @@ window.wfApplyRemoteState = function (remote) {
   };
   isHeightEditing = !Boolean(state.profile.heightCm);
   syncProfileForm();
+  applyStoredDrafts();
   syncHeightLockState();
   render();
 };
@@ -113,6 +145,10 @@ function bindEvents() {
   el.importHealthButton.addEventListener("click", () => el.healthXmlInput.click());
   el.healthXmlInput.addEventListener("change", handleHealthImport);
   el.historyList.addEventListener("click", handleHistoryClick);
+  [el.entryForm, el.workoutForm, el.profileForm].forEach(form => {
+    form.addEventListener("input", persistCurrentInputs);
+    form.addEventListener("change", persistCurrentInputs);
+  });
 
   // Log tabs
   document.querySelectorAll(".log-tab").forEach(btn => {
@@ -144,6 +180,17 @@ function bindEvents() {
       renderChart();
     });
   });
+
+  // Period tabs
+  document.querySelectorAll(".period-tab").forEach(btn => {
+    btn.addEventListener("click", () => {
+      activePeriod = btn.dataset.period;
+      document.querySelectorAll(".period-tab").forEach(b => b.classList.remove("period-tab-active"));
+      btn.classList.add("period-tab-active");
+      const metrics = calculateMetrics(state.profile, state.entries, state.workouts);
+      renderStats(metrics);
+    });
+  });
 }
 
 // ─── Handlers ───────────────────────────────────────────────────────────────
@@ -163,8 +210,10 @@ function handleEntrySubmit(event) {
   }
 
   persist();
+  clearDraftSection("entry");
   el.entryWeight.value = "";
   syncEntryDateTimeInputs();
+  persistCurrentInputs();
   render();
   el.entryWeight.focus();
 }
@@ -194,8 +243,10 @@ function handleWorkoutSubmit(event) {
   }];
 
   persist();
+  clearDraftSection("workout");
   el.workoutForm.reset();
   syncWorkoutDateInput();
+  persistCurrentInputs();
   render();
 }
 
@@ -207,7 +258,9 @@ function handleProfileSubmit(event) {
   };
   if (state.profile.heightCm) isHeightEditing = false;
   persist();
+  clearDraftSection("profile");
   syncHeightLockState();
+  persistCurrentInputs();
   render();
 }
 
@@ -217,6 +270,7 @@ function handleStepAdjust(event) {
   const delta = parseFloat(button.dataset.adjust);
   const base = parseNumber(el.entryWeight.value) ?? getLatestEntry(state.entries)?.weightKg ?? 0;
   el.entryWeight.value = Math.max(0.1, base + delta).toFixed(1);
+  persistCurrentInputs();
 }
 
 function toggleHeightLock() {
@@ -243,6 +297,7 @@ function fillWithLatestWeight() {
   const latest = getLatestEntry(state.entries);
   if (!latest) { alert("まだ前回値がありません。最初の記録を追加してください。"); return; }
   el.entryWeight.value = formatWeight(latest.weightKg);
+  persistCurrentInputs();
   el.entryWeight.focus();
   el.entryWeight.select();
 }
@@ -258,8 +313,12 @@ function fillWithSampleData() {
   };
   isHeightEditing = false;
   persist();
+  clearAllDrafts();
+  syncEntryDateTimeInputs();
+  syncWorkoutDateInput();
   syncProfileForm();
   syncHeightLockState();
+  persistCurrentInputs();
   render();
 }
 
@@ -274,12 +333,15 @@ function resetAllData() {
   state = structuredClone(defaultState);
   isHeightEditing = true;
   localStorage.removeItem(STORAGE_KEY);
+  clearAllDrafts();
   // Firebase のデータも削除
   window.wfSync?.clear();
   syncProfileForm();
   syncHeightLockState();
   el.entryForm.reset();
+  el.workoutForm.reset();
   syncEntryDateTimeInputs();
+  syncWorkoutDateInput();
   render();
 }
 
@@ -288,13 +350,13 @@ function exportCsv() {
   if (sorted.length === 0 && state.workouts.length === 0) { alert("書き出す記録がまだありません。"); return; }
 
   const weightRows = sorted.map(e => [
-    "weight", csvSafe(e.recordedAt), e.recordedAt.slice(0,10), e.recordedAt.slice(11,16), e.weightKg, "", "", "", ""
+    "weight", csvSafe(e.recordedAt), e.recordedAt.slice(0,10), e.recordedAt.slice(11,16), e.weightKg, "", "", "", "", ""
   ]);
   const workoutRows = state.workouts.map(w => [
-    "workout", csvSafe(w.date), w.date, "", "", w.type, w.distanceKm ?? "", w.durationMin ?? "", w.calories ?? ""
+    "workout", csvSafe(w.date), w.date, "", "", w.type, w.distanceKm ?? "", w.durationMin ?? "", w.calories ?? "", w.heartRateBpm ?? ""
   ]);
 
-  const header = ["type", "recordedAt", "date", "time", "weightKg", "workoutType", "distanceKm", "durationMin", "calories"];
+  const header = ["type", "recordedAt", "date", "time", "weightKg", "workoutType", "distanceKm", "durationMin", "calories", "heartRateBpm"];
   const csv = [header.join(","), ...weightRows.map(r => r.join(",")), ...workoutRows.map(r => r.join(","))].join("\n");
 
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -343,16 +405,22 @@ function renderStats(metrics) {
   el.latestDeltaSubtext.textContent = metrics.latestDeltaSubtext;
   el.rollingAverageStat.textContent = metrics.rollingAverageLabel;
   el.rollingAverageSubtext.textContent = metrics.rollingAverageSubtext;
-  el.startChangeStat.textContent = metrics.startChangeLabel;
-  el.startChangeSubtext.textContent = metrics.startChangeSubtext;
+  if (el.startChangeLabel) el.startChangeLabel.textContent = `${metrics.periodLabel}の変化`;
+  el.startChangeStat.textContent = metrics.periodChangeLabel;
+  el.startChangeSubtext.textContent = metrics.periodChangeSubtext;
   el.goalDeltaStat.textContent = metrics.goalDeltaLabel;
   el.goalDeltaSubtext.textContent = metrics.goalDeltaSubtext;
   el.bmiStat.textContent = metrics.bmiLabel;
   el.bmiSubtext.textContent = metrics.bmiSubtext;
 
   // Fitness stats
+  if (el.fitnessSectionLabel) {
+    el.fitnessSectionLabel.textContent = `🏃 フィットネス（${metrics.periodLabel}）`;
+  }
   el.weekWorkoutCount.textContent = `${metrics.thisWeekWorkouts.length} 回`;
-  el.weekWorkoutCountSub.textContent = metrics.thisWeekWorkouts.length > 0 ? `今週 ${metrics.thisWeekWorkouts.map(w => workoutLabel(w.type)).join("・")}` : "今週のワークアウト";
+  el.weekWorkoutCountSub.textContent = metrics.thisWeekWorkouts.length > 0
+    ? `${metrics.periodLabel} ${metrics.thisWeekWorkouts.map(w => workoutLabel(w.type)).join("・")}`
+    : `${metrics.periodLabel}のワークアウト`;
   el.weekDistance.textContent = metrics.thisWeekDistance > 0 ? `${metrics.thisWeekDistance.toFixed(1)} km` : "-- km";
   el.weekDistanceSub.textContent = metrics.thisWeekDistance > 0 ? `${metrics.thisWeekWorkouts.filter(w => w.distanceKm).length}件の合計` : "今週の走行・歩行距離";
   el.weekCalories.textContent = metrics.thisWeekCalories > 0 ? `${metrics.thisWeekCalories} kcal` : "-- kcal";
@@ -630,8 +698,8 @@ function calculateMetrics(profile, entries, workouts) {
   const currentWeight = currentEntry?.weightKg ?? null;
   const goalWeight = parseNumber(profile.goalWeightKg);
   const heightCm = parseNumber(profile.heightCm);
-  const heightLabel = isFinite(heightCm) ? `${formatWeight(heightCm)} cm` : "未設定";
-  const goalLabel = isFinite(goalWeight) ? `${formatWeight(goalWeight)} kg` : "--.- kg";
+  const heightLabel = (isFinite(heightCm) && heightCm > 0) ? `${formatWeight(heightCm)} cm` : "未設定";
+  const goalLabel = (isFinite(goalWeight) && goalWeight > 0) ? `${formatWeight(goalWeight)} kg` : "--.- kg";
 
   let heroMessage = "最初の記録を追加すると、ここに進捗が表示されます。";
   let quickTrendText = "前回比は記録が増えると表示されます。";
@@ -688,13 +756,45 @@ function calculateMetrics(profile, entries, workouts) {
     bmiSubtext = bmiStatusLabel(bmi);
   }
 
-  // Workout metrics (this week)
+  // ─ Period filtering ─────────────────────────────────────────────────────
   const now = new Date();
-  const weekStart = new Date(now);
-  weekStart.setDate(now.getDate() - now.getDay());
-  weekStart.setHours(0, 0, 0, 0);
+  const periodStart = getPeriodStart(activePeriod, now);
+  const periodLabel = getPeriodLabel(activePeriod);
 
-  const thisWeekWorkouts = workouts.filter(w => new Date(w.date) >= weekStart);
+  // Entries and workouts within the selected period
+  const periodEntries = periodStart
+    ? sortedEntries.filter(e => new Date(e.recordedAt) >= periodStart)
+    : sortedEntries;
+  const periodWorkouts = periodStart
+    ? workouts.filter(w => new Date(w.date + "T00:00:00") >= periodStart)
+    : workouts;
+
+  // Rolling average: use period entries (or all if none in period)
+  if (currentEntry) {
+    const base = periodEntries.length > 0 ? periodEntries : sortedEntries.slice(-7);
+    const avg = base.reduce((s, e) => s + e.weightKg, 0) / base.length;
+    rollingAverageLabel = `${formatWeight(avg)} kg`;
+    rollingAverageSubtext = periodEntries.length > 0
+      ? `${periodLabel}内 ${base.length}件の平均`
+      : `最新${base.length}件の平均`;
+  }
+
+  // Period weight change: earliest entry in period → latest
+  let periodChangeLabel = "--.- kg";
+  let periodChangeSubtext = `${periodLabel}の変化`;
+  if (periodEntries.length >= 2) {
+    const periodFirst = periodEntries[0];
+    const periodLast = periodEntries[periodEntries.length - 1];
+    const periodDelta = periodLast.weightKg - periodFirst.weightKg;
+    periodChangeLabel = formatWeightChange(periodDelta);
+    periodChangeSubtext = `${formatDateTime(periodFirst.recordedAt)} から`;
+  } else if (periodEntries.length === 1) {
+    periodChangeLabel = `${formatWeight(periodEntries[0].weightKg)} kg`;
+    periodChangeSubtext = `${periodLabel}内は1件のみ`;
+  }
+
+  // Fitness stats for selected period
+  const thisWeekWorkouts = periodWorkouts;
   const thisWeekDistance = thisWeekWorkouts.reduce((s, w) => s + (w.distanceKm || 0), 0);
   const thisWeekCalories = thisWeekWorkouts.reduce((s, w) => s + (w.calories || 0), 0);
 
@@ -709,7 +809,7 @@ function calculateMetrics(profile, entries, workouts) {
     const paceM = Math.floor(paceMin);
     const paceS = Math.round((paceMin - paceM) * 60);
     avgPaceLabel = `${paceM}'${String(paceS).padStart(2, "0")}"`;
-    avgPaceSub = `今週${runWorkouts.length}回のランニング`;
+    avgPaceSub = `${periodLabel} ${runWorkouts.length}回のランニング`;
   }
 
   return {
@@ -718,11 +818,32 @@ function calculateMetrics(profile, entries, workouts) {
     latestDeltaLabel, latestDeltaSubtext,
     rollingAverageLabel, rollingAverageSubtext,
     startChangeLabel, startChangeSubtext,
+    periodChangeLabel, periodChangeSubtext,
     goalDeltaLabel, goalDeltaSubtext,
     bmiLabel, bmiSubtext, profileGoalHint,
     thisWeekWorkouts, thisWeekDistance, thisWeekCalories,
-    avgPaceLabel, avgPaceSub
+    avgPaceLabel, avgPaceSub, periodLabel
   };
+}
+
+// ─── Period Helpers ───────────────────────────────────────────────────────────
+function getPeriodStart(period, now) {
+  if (period === "all") return null;
+  const d = new Date(now);
+  if (period === "7d") {
+    d.setDate(d.getDate() - 6);
+  } else if (period === "30d") {
+    d.setDate(d.getDate() - 29);
+  } else if (period === "90d") {
+    d.setDate(d.getDate() - 89);
+  }
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function getPeriodLabel(period) {
+  const labels = { "7d": "今週", "30d": "30日", "90d": "90日", "all": "全期間" };
+  return labels[period] || period;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -753,35 +874,354 @@ function getLatestEntry(entries) {
   return sorted[sorted.length - 1] ?? null;
 }
 
+function loadDrafts() {
+  try {
+    const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return normalizeDrafts(parsed);
+  } catch {
+    return null;
+  }
+}
+
 function loadState() {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      return {
-        profile: { ...defaultState.profile, ...(parsed.profile ?? {}) },
-        entries: Array.isArray(parsed.entries) ? parsed.entries : [],
-        workouts: Array.isArray(parsed.workouts) ? parsed.workouts : []
-      };
+    const candidates = buildStorageCandidates();
+    let best = null;
+
+    for (const key of candidates) {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+
+      const parsed = safeJsonParse(raw);
+      const normalized = normalizeStateCandidate(parsed);
+      if (!normalized) continue;
+
+      const score = scoreStoredState(normalized, key === STORAGE_KEY);
+      if (!best || score > best.score) {
+        best = { state: normalized, source: key, score };
+      }
     }
-    // Legacy migration
-    const legacy = localStorage.getItem("weight-flow-storage-v3");
-    if (legacy) {
-      const parsed = JSON.parse(legacy);
-      return {
-        profile: { heightCm: parsed.profile?.heightCm ?? "", goalWeightKg: parsed.profile?.goalWeightKg ?? "" },
-        entries: Array.isArray(parsed.entries) ? parsed.entries.map(e => ({ id: e.id ?? crypto.randomUUID(), recordedAt: normalizeRecordedAt(e), weightKg: e.weightKg })) : [],
-        workouts: []
-      };
+
+    if (best) {
+      return best;
     }
-    return structuredClone(defaultState);
-  } catch { return structuredClone(defaultState); }
+
+    return { state: structuredClone(defaultState), source: null };
+  } catch {
+    return { state: structuredClone(defaultState), source: null };
+  }
 }
 
 function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  writeStateToStorage(state);
   // Firebase 同期フック（firebase-sync.js が読み込まれている場合のみ動作）
   window.wfSync?.push(state);
+}
+
+function normalizeDrafts(raw) {
+  return {
+    entry: {
+      date: String(raw?.entry?.date ?? ""),
+      time: String(raw?.entry?.time ?? ""),
+      weight: String(raw?.entry?.weight ?? "")
+    },
+    workout: {
+      date: String(raw?.workout?.date ?? ""),
+      type: String(raw?.workout?.type ?? ""),
+      distance: String(raw?.workout?.distance ?? ""),
+      duration: String(raw?.workout?.duration ?? ""),
+      calories: String(raw?.workout?.calories ?? ""),
+      heartRate: String(raw?.workout?.heartRate ?? "")
+    },
+    profile: {
+      heightCm: String(raw?.profile?.heightCm ?? ""),
+      goalWeightKg: String(raw?.profile?.goalWeightKg ?? "")
+    }
+  };
+}
+
+function collectCurrentInputs() {
+  return {
+    entry: {
+      date: el.entryDate.value,
+      time: el.entryTime.value,
+      weight: el.entryWeight.value
+    },
+    workout: {
+      date: el.workoutDate.value,
+      type: el.workoutType.value,
+      distance: el.workoutDistance.value,
+      duration: el.workoutDuration.value,
+      calories: el.workoutCalories.value,
+      heartRate: el.workoutHeartRate.value
+    },
+    profile: {
+      heightCm: el.heightCm.value,
+      goalWeightKg: el.goalWeightKg.value
+    }
+  };
+}
+
+function persistCurrentInputs() {
+  formDrafts = normalizeDrafts(collectCurrentInputs());
+  hasStoredDrafts = true;
+  localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(formDrafts));
+}
+
+function applyStoredDrafts() {
+  if (!hasStoredDrafts) return;
+
+  el.entryDate.value = formDrafts.entry.date;
+  el.entryTime.value = formDrafts.entry.time;
+  el.entryWeight.value = formDrafts.entry.weight;
+
+  el.workoutDate.value = formDrafts.workout.date;
+  if (formDrafts.workout.type) el.workoutType.value = formDrafts.workout.type;
+  el.workoutDistance.value = formDrafts.workout.distance;
+  el.workoutDuration.value = formDrafts.workout.duration;
+  el.workoutCalories.value = formDrafts.workout.calories;
+  el.workoutHeartRate.value = formDrafts.workout.heartRate;
+
+  el.heightCm.value = formDrafts.profile.heightCm;
+  el.goalWeightKg.value = formDrafts.profile.goalWeightKg;
+}
+
+function clearDraftSection(section) {
+  formDrafts = {
+    ...formDrafts,
+    [section]: structuredClone(defaultDrafts[section])
+  };
+  localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(formDrafts));
+}
+
+function clearAllDrafts() {
+  formDrafts = structuredClone(defaultDrafts);
+  hasStoredDrafts = false;
+  localStorage.removeItem(DRAFT_STORAGE_KEY);
+}
+
+function writeStateToStorage(nextState) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
+}
+
+function buildStorageCandidates() {
+  const keys = new Set([STORAGE_KEY, ...LEGACY_STORAGE_KEYS]);
+
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key || key === STORAGE_KEY || key.includes("sync-code")) continue;
+    if (/weight|flow|bodymass|workout/i.test(key)) {
+      keys.add(key);
+    }
+  }
+
+  return [...keys];
+}
+
+function safeJsonParse(raw) {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function normalizeStateCandidate(candidate) {
+  if (candidate == null) return null;
+
+  if (Array.isArray(candidate)) {
+    const mixed = normalizeMixedRecords(candidate);
+    return hasMeaningfulState(mixed) ? mixed : null;
+  }
+
+  if (typeof candidate !== "object") return null;
+
+  const mixed = normalizeMixedRecords(candidate.records ?? candidate.logs ?? candidate.items ?? []);
+  const entries = normalizeEntries(pickCollection(
+    candidate.entries,
+    candidate.weights,
+    candidate.weightEntries,
+    candidate.weightLogs,
+    mixed.entries
+  ));
+  const workouts = normalizeWorkouts(pickCollection(
+    candidate.workouts,
+    candidate.workoutEntries,
+    candidate.workoutLogs,
+    candidate.activities,
+    candidate.exercises,
+    mixed.workouts
+  ));
+  const profile = normalizeProfileCandidate(
+    candidate.profile ??
+    candidate.userProfile ??
+    candidate.settings ??
+    candidate.user ??
+    {}
+  );
+
+  const normalized = { profile, entries, workouts };
+  if (!hasMeaningfulState(normalized)) return null;
+  return normalized;
+}
+
+function normalizeMixedRecords(records) {
+  const normalized = { profile: { ...defaultState.profile }, entries: [], workouts: [] };
+  if (!Array.isArray(records)) return normalized;
+
+  records.forEach((record, index) => {
+    const entry = normalizeEntryCandidate(record, index);
+    if (entry) {
+      normalized.entries.push(entry);
+      return;
+    }
+
+    const workout = normalizeWorkoutCandidate(record, index);
+    if (workout) {
+      normalized.workouts.push(workout);
+    }
+  });
+
+  normalized.entries.sort((a, b) => a.recordedAt.localeCompare(b.recordedAt));
+  normalized.workouts.sort((a, b) => a.date.localeCompare(b.date));
+  return normalized;
+}
+
+function pickCollection(...collections) {
+  return collections.find(list => Array.isArray(list) && list.length > 0)
+    ?? collections.find(Array.isArray)
+    ?? [];
+}
+
+function normalizeEntries(entries) {
+  if (!Array.isArray(entries)) return [];
+
+  return entries
+    .map((entry, index) => normalizeEntryCandidate(entry, index))
+    .filter(Boolean)
+    .sort((a, b) => a.recordedAt.localeCompare(b.recordedAt));
+}
+
+function normalizeWorkouts(workouts) {
+  if (!Array.isArray(workouts)) return [];
+
+  return workouts
+    .map((workout, index) => normalizeWorkoutCandidate(workout, index))
+    .filter(Boolean)
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function normalizeEntryCandidate(entry, index) {
+  if (!entry || typeof entry !== "object") return null;
+
+  const recordedAt = normalizeDateTimeValue(
+    entry.recordedAt ??
+    entry.datetime ??
+    entry.timestamp ??
+    entry.createdAt ??
+    entry.loggedAt ??
+    entry.dateTime
+  ) || normalizeRecordedAt(entry);
+  const weightKg = parseNumber(
+    entry.weightKg ??
+    entry.weight ??
+    entry.value ??
+    entry.kg ??
+    entry.bodyMass
+  );
+
+  if (!recordedAt || weightKg == null) return null;
+
+  return {
+    id: entry.id ?? `restored-entry-${index}-${recordedAt}`,
+    recordedAt,
+    weightKg
+  };
+}
+
+function normalizeWorkoutCandidate(workout, index) {
+  if (!workout || typeof workout !== "object") return null;
+
+  const date = normalizeDateValue(
+    workout.date ??
+    workout.recordedAt ??
+    workout.datetime ??
+    workout.timestamp ??
+    workout.createdAt
+  );
+  const distanceKm = parseNumber(workout.distanceKm ?? workout.distance);
+  const durationMin = parseNumber(workout.durationMin ?? workout.duration);
+  const calories = parseNumber(workout.calories ?? workout.energy ?? workout.kcal);
+  const heartRateBpm = parseNumber(workout.heartRateBpm ?? workout.heartRate ?? workout.avgHeartRate);
+
+  if (!date || (distanceKm == null && durationMin == null && calories == null)) return null;
+
+  return {
+    id: workout.id ?? `restored-workout-${index}-${date}`,
+    date,
+    type: workout.type ?? workout.workoutType ?? workout.activityType ?? "other",
+    distanceKm,
+    durationMin,
+    calories,
+    heartRateBpm
+  };
+}
+
+function normalizeProfileCandidate(profile) {
+  return {
+    heightCm: String(profile?.heightCm ?? profile?.height ?? "").trim(),
+    goalWeightKg: String(profile?.goalWeightKg ?? profile?.goalWeight ?? profile?.goal ?? "").trim()
+  };
+}
+
+function normalizeDateTimeValue(value) {
+  if (value == null || value === "") return "";
+
+  if (typeof value === "number") {
+    const date = new Date(value);
+    if (isNaN(date.getTime())) return "";
+    return combineDateAndTime(isoLocalDate(date), currentTimeValue(date));
+  }
+
+  const text = String(value).trim();
+  if (!text) return "";
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(text)) return text.slice(0, 16);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return combineDateAndTime(text, "08:00");
+
+  const date = new Date(text);
+  if (isNaN(date.getTime())) return "";
+  return combineDateAndTime(isoLocalDate(date), currentTimeValue(date));
+}
+
+function normalizeDateValue(value) {
+  if (value == null || value === "") return "";
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) return value.trim();
+
+  const date = new Date(value);
+  if (isNaN(date.getTime())) return "";
+  return isoLocalDate(date);
+}
+
+function hasMeaningfulState(candidate) {
+  if (!candidate) return false;
+  const profile = candidate.profile ?? {};
+
+  return (
+    Boolean(profile.heightCm) ||
+    Boolean(profile.goalWeightKg) ||
+    (Array.isArray(candidate.entries) && candidate.entries.length > 0) ||
+    (Array.isArray(candidate.workouts) && candidate.workouts.length > 0)
+  );
+}
+
+function scoreStoredState(candidate, isCurrentKey) {
+  const entryCount = Array.isArray(candidate.entries) ? candidate.entries.length : 0;
+  const workoutCount = Array.isArray(candidate.workouts) ? candidate.workouts.length : 0;
+  const profileCount = [candidate.profile?.heightCm, candidate.profile?.goalWeightKg].filter(Boolean).length;
+
+  return entryCount * 10 + workoutCount * 10 + profileCount + (isCurrentKey ? 0.5 : 0);
 }
 
 function syncProfileForm() {

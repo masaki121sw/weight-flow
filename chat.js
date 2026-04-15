@@ -226,8 +226,14 @@
     const bubble = document.createElement("div");
     bubble.className = `wf-msg wf-msg-${sender}`;
 
-    // **太字** パターンをHTMLに変換
-    const html = text
+    // HTMLエスケープしてからマークダウンを変換（XSS対策）
+    const escaped = text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+    const html = escaped
       .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
       .replace(/\n/g, "<br>");
 
